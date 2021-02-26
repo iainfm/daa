@@ -1,0 +1,3062 @@
+REM > !RunImage
+REM TRACE TO "RAM:$.TRACE"
+REM TRACE ON
+REM ON ERROR MO.0:REPO.:P.ERL:END
+REM © Iain F. McLaren & Wardlaw Surveys 1992-1998
+
+DIM pb &200,pfb &200,bk &200,icontextbuff 32,rb% &100
+DIM iconvalidbuff 32
+DIM bk &100,eb &100
+
+DIM files$(77)
+DIM gr% &100,gws% &200,se% &100
+
+DIM filedata &800
+DIM menub &1000,menudata &1000
+DIM item$(100),sitem$(100),menus(8),sp_col(15)
+DIM ow% &2560,gwi 256,cl 256,wo% 256
+DIM test 1000,valid 100
+DIM page &400,sprite_name% 128
+DIM cuttype$(6),filltype$(6)
+DIM sp_scale% 128:!sp_scale%=1:sp_scale%!4=1:sp_scale%!8=1:sp_scale%!12=1
+DIM my_scale% 128:!my_scale%=100:my_scale%!4=100:my_scale%!8=100:my_scale%!12=100
+DIM pl_scale% 128:PROCsetscale
+DIM trans% 512,wintitle% &200,msg% 128
+DIM new% &256
+DIM icon_state% &100
+DIM ans 1000, t_ans 1000
+DIM var 4096
+DIM sb 100
+DIM ms% &500
+DIM drag &200
+DIM p_trans% 160,p_scl% 160
+DIM ud% 1000
+DIM set 128,owb 128,col_set 64,saopt% 16, Tinfo$(3)
+DIM spnptr 16,menusel 16, q% &2000, qq% 256
+$test="012345678901234567890"
+
+$valid=""
+q$=CHR$(34)
+job$="":title$="":chain$=""
+sprite_loaded=FALSE
+last_sprite$=""
+tick%=FALSE:dotted%=FALSE:writeable%=FALSE:shaded%=FALSE:submenu%=FALSE
+change=TRUE:item=1
+smenu%=-1
+cal_area%=0
+calibrating=FALSE
+cutting=FALSE
+filling=FALSE
+picking=FALSE
+append=TRUE
+current_cut=1
+current_fill=1
+current_calib=1
+calib%=0:res%=TRUE
+cut=0
+fill=0
+total_cut=0
+total_fill=0
+scl=0
+l_col%=&7
+known_area=0
+num%=1:den%=1
+intro=FALSE
+cut_type$=""
+fill_type$=""
+sprite_name$=""
+zise=0
+@%="+F2.2"
+s_chr%=ASC"²"
+print%=FALSE
+first_open%=TRUE
+per_scale%=100
+error_correct%=0
+DIM cut(30),fill(30)
+cut_sel=0:fill_sel=0
+tinfo=0
+toolbox%=1:curr_tool=0
+PROCm_list
+SYS"Wimp_Initialise",300,&4B534154,"DAA",list% TO wver%,my_task%
+wver$=STR$(wver%)
+PROCstd_error
+PROCread_slot_size
+PROCopentemp
+PROCpseudo_click(save_data%,4,1)
+PROCmessages
+no_grey%=EVAL(wver$+no_grey$)
+IF no_grey% PROCgrey(opt%,8)
+PROCload_title
+PROCload_types
+
+PROCloadoptions
+PROCsetupmenus
+PROCset_toolbox
+aboot=TRUE
+iconbaricon=FNicon_iconbar
+directory$="":dir$=""
+dragging=FALSE
+
+REM PROCcheck_for_printer
+REM IF printer_selected=FA. PROCgrey(tools%,5)
+
+PROCpoll
+END
+
+DEF PROCpoll
+REPEAT
+
+IF dragging mask%=0 ELSE mask%=1
+SYS"Wimp_Poll",mask%,q% TO act%,rb%
+
+CASE act% OF
+
+   WHEN 0 : IF dragging PROCdragging
+   WHEN 1 : PROCredraw(!q%,TRUE)
+   WHEN 2 : PROCopen(rb%)
+   WHEN 3 : PROCclose(rb%)
+   WHEN 4 : PROCwin_leave
+   WHEN 5 : PROCwin_enter
+   WHEN 6 : PROCclick
+   WHEN 7 : PROCdrag_end:REM PROCdraw_line:SYS"DragASprite_Stop"
+   WHEN 8 : PROCkeypressed
+   WHEN 9 : PROCmenuselect
+   WHEN 12: PROCgaincret(rb%)
+   WHEN 17,18
+
+      PROCreceive(q%!16)
+   WHEN 19: PROCuser_mess_ack
+ENDCASE
+
+UNTIL FALSE
+ENDPROC
+
+DEF FNicon_iconbar
+ LOCAL handle
+ bk!0=-1
+ bk!4=0
+ bk!8=0
+ bk!12=114
+ bk!16=80
+ bk!20=%010111000000000010000000001010
+
+ $icontextbuff=""
+ $iconvalidbuff="!daa"
+ $(bk+24)=$iconvalidbuff
+ bk!28=%010
+ SYS "Wimp_CreateIcon",,bk TO handle
+=handle
+
+DEF PROCquit
+
+@%="g10.9"
+FOR f=0 TO 255
+
+WHILE fref?f>0:SYS"Font_LoseFont",f:fref?f-=1:ENDWHILE
+NEXT
+SYS"Wimp_CloseDown"
+IF sprite_loaded=TRUE OR intro=TRUE PROCdisclaim_mod(sp)
+END
+ENDPROC
+
+DEF PROCclose(rb%)
+
+SYS"Wimp_GetPointerInfo",,pb
+IF pb!8=1 AND path$<>"" AND INKEY(-1) AND !rb%=main% SYS"XOS_CLI","Filer_OpenDir "+path$:ENDPROC
+IF pb!8=1 AND INKEY(-1) AND !rb%=main% ENDPROC
+
+SYS"Wimp_CloseWindow",,rb%
+
+IF !rb%=main% THEN
+!rb%=tools%
+SYS"Wimp_CloseWindow",,rb%
+IF pb!8=1 AND path$<>"" SYS"XOS_CLI","Filer_OpenDir "+path$
+ENDIF
+
+ENDPROC
+
+DEF PROCreceive(rx%)
+
+REM message request: &502
+CASE rx% OF
+WHEN &502   : PROChelp
+   WHEN 0 : PROCquit
+   WHEN 2 : filer=rb%!36
+            REM 'my_ref=rb%!12
+            IF print%=TRUE THEN
+                        PROCprint__data
+                        ELSE
+                        CASE rb%!40 OF
+                             WHEN &FF9 : PROCsave_image
+                             WHEN &DFE : PROCsave_results
+                             ENDCASE
+                        ENDIF
+   WHEN 4 : REM VDU4:PRINTTAB(0,0);FNextract(rb%+44)
+   WHEN &400C0 : PROCcreatesubmenu
+   WHEN &400C1 : PROCmodechanged
+   WHEN &400CC : PROCclosew(rb%!20)
+   WHEN &80142 :
+   WHEN &80143 : REM PROCtell("init")
+   WHEN &80147 :
+   WHEN 9 : PROCpalette_changed
+   WHEN 3 : PROCreceivedata(q%)
+
+   ENDCASE
+ENDPROC
+
+DEF PROCopentemp
+DIM fref 256
+FOR f=0 TO 255:fref?f=0:NEXT
+SYS "Wimp_OpenTemplate",,"<AreaApp$Dir>.Templates"
+
+SYS "Wimp_LoadTemplate",,0,,,,"Info",0 TO ,rqd_buff_size%,rqd_wspace%
+REM VDU4:PRINTTAB(0,0);
+DIM q% rqd_buff_size%,temp% rqd_wspace%
+SYS "Wimp_LoadTemplate",,q%,temp%,temp%+rqd_wspace%,fref,"Info",0
+SYS "Wimp_CreateWindow",,q% TO info%
+
+SYS "Wimp_LoadTemplate",,0,,,,"count",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM s% rqd_buff_size%, cou% rqd_wspace%
+SYS "Wimp_LoadTemplate",,s%,cou%,cou%+rqd_wspace%,fref,"count",0
+SYS "Wimp_CreateWindow",,s% TO count%
+
+SYS "Wimp_LoadTemplate",,0,,,,"tools",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM t% rqd_buff_size%, tool% rqd_wspace%
+SYS "Wimp_LoadTemplate",,t%,tool%,tool%+rqd_wspace%,fref,"tools",0
+SYS "Wimp_CreateWindow",,t% TO tools%
+
+SYS "Wimp_LoadTemplate",,0,,,,"view",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM r% rqd_buff_size%, view% rqd_wspace%
+SYS "Wimp_LoadTemplate",,r%,view%,view%+rqd_wspace%,fref,"view",0
+r%?68=16
+r%!24=tools%
+SYS "Wimp_CreateWindow",,r% TO main%
+
+SYS "Wimp_LoadTemplate",,0,,,,"title",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM u% rqd_buff_size%, data% rqd_wspace%
+SYS "Wimp_LoadTemplate",,u%,data%,data%+rqd_wspace%,fref,"title",0
+SYS "Wimp_CreateWindow",,u% TO title%
+
+SYS "Wimp_LoadTemplate",,0,,,,"calc",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM v% rqd_buff_size%, clc% rqd_wspace%
+SYS "Wimp_LoadTemplate",,v%,clc%,clc%+rqd_wspace%,fref,"calc",0
+SYS "Wimp_CreateWindow",,v% TO calc%
+
+SYS "Wimp_LoadTemplate",,0,,,,"area",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM w% rqd_buff_size%, arya% rqd_wspace%
+SYS "Wimp_LoadTemplate",,w%,arya%,arya%+rqd_wspace%,fref,"area",0
+SYS "Wimp_CreateWindow",,w% TO area%
+
+SYS "Wimp_LoadTemplate",,0,,,,"total",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM x% rqd_buff_size%, tot% rqd_wspace%
+SYS "Wimp_LoadTemplate",,x%,tot%,tot%+rqd_wspace%,fref,"total",0
+SYS "Wimp_CreateWindow",,x% TO total%
+
+SYS "Wimp_LoadTemplate",,0,,,,"options",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM y% rqd_buff_size%, opts% rqd_wspace%
+SYS "Wimp_LoadTemplate",,y%,opts%,opts%+rqd_wspace%,fref,"options",0
+SYS "Wimp_CreateWindow",,y% TO opt%
+
+SYS "Wimp_LoadTemplate",,0,,,,"magnifier",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM z% rqd_buff_size%, mag% rqd_wspace%
+SYS "Wimp_LoadTemplate",,z%,mag%,mag%+rqd_wspace%,fref,"magnifier",0
+SYS "Wimp_CreateWindow",,z% TO zoom%
+
+SYS "Wimp_LoadTemplate",,0,,,,"xfer_send",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM o% rqd_buff_size%, save% rqd_wspace%
+SYS "Wimp_LoadTemplate",,o%,save%,save%+rqd_wspace%,fref,"xfer_send",0
+SYS "Wimp_CreateWindow",,o% TO save_image%
+
+SYS "Wimp_LoadTemplate",,0,,,,"data_send",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM p% rqd_buff_size%, data_save% rqd_wspace%
+SYS "Wimp_LoadTemplate",,p%,data_save%,data_save%+rqd_wspace%,fref,"data_send",0
+SYS "Wimp_CreateWindow",,p% TO save_data%
+
+SYS "Wimp_LoadTemplate",,0,,,,"scale",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM pp% rqd_buff_size%, w_scale% rqd_wspace%
+SYS "Wimp_LoadTemplate",,pp%,w_scale%,w_scale%+rqd_wspace%,fref,"scale",0
+SYS "Wimp_CreateWindow",,pp% TO scale_win%
+
+SYS "Wimp_LoadTemplate",,0,,,,"Correction",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM ppp% rqd_buff_size%, w_correct% rqd_wspace%
+SYS "Wimp_LoadTemplate",,ppp%,w_correct%,w_correct%+rqd_wspace%,fref,"correction",0
+SYS "Wimp_CreateWindow",,ppp% TO correct%
+
+SYS "Wimp_LoadTemplate",,0,,,,"Close",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM cls% rqd_buff_size%, w_cls% rqd_wspace%
+SYS "Wimp_LoadTemplate",,cls%,w_cls%,w_cls%+rqd_wspace%,fref,"close",0
+SYS "Wimp_CreateWindow",,cls% TO close%
+
+SYS "Wimp_LoadTemplate",,0,,,,"ColoursY",0 TO ,rqd_buff_size%,rqd_wspace%
+DIM cols% rqd_buff_size%, w_cols% rqd_wspace%
+SYS "Wimp_LoadTemplate",,cols%,w_cols%,w_cols%+rqd_wspace%,fref,"ColoursY",0
+SYS "Wimp_CreateWindow",,cols% TO colours%
+
+REM SYS "Wimp_LoadTemplate",,0,,,,"ColoursX",0 TO ,rqd_buff_size%,rqd_wspace%
+REM DIM cols2% 2*rqd_buff_size%, w_cols2% 2*rqd_wspace%
+REM SYS "Wimp_LoadTemplate",,cols2%,w_cols2%,w_cols2%+2*rqd_wspace%,fref,"ColoursX",0
+REM SYS "Wimp_CreateWindow",,cols2% TO colours%
+SYS "Wimp_CloseTemplate"
+ENDPROC
+
+DEF PROCopen(wb%)
+REM FORa=1 TO 2
+IF !wb%=main% THEN
+   FOR a=1 TO 2
+   !owb=tools%
+   min_x=wb%!4-178:IF min_x<0 min_x=0
+   IF wb%!4<0 min_x=wb%!4
+
+   owb!4=min_x
+   owb!8=wb%!16-460
+   owb!12=min_x+178
+   owb!16=wb%!16
+   owb!20=0
+   owb!24=0
+   owb!28=wb%!28
+   IF toolbox%<>0 SYS"Wimp_OpenWindow",,owb
+   IF toolbox%<>0 wb%!28=tools%
+   SYS"Wimp_OpenWindow",,wb%
+   NEXT
+   GCOL0,0
+   REM REC.FILL wb%!4,wb%!16,40,40
+   ELSE
+SYS"Wimp_OpenWindow",,wb%
+ENDIF
+ENDPROC
+
+DEF PROCreceivedata(q%)
+filetype=q%!40:IF filetype<>&FF9 ENDPROC
+
+!wintitle%=main%
+SYS"Wimp_GetWindowInfo",,wintitle%
+
+dir$="":pos=44
+REPEAT
+   chr=(q%?pos)
+   IF chr<>0 dir$=dir$+CHR$(chr)
+
+   pos+=1
+
+   UNTIL chr=0 OR chr=13
+
+$(wintitle%!76)=dir$
+
+PROCsplit(dir$)
+filename$=dir$
+res%=TRUE:PROCinit_spr_area(dir$):sprite_loaded=TRUE:PROCread_palette:PROCstart
+ENDPROC
+
+DEF PROCsetdir(directory$)
+
+x=OPENIN("<AreaApp$Dir>.loadlist")
+
+line=1
+REPEAT
+chr=BGET#x
+
+IF chr<>10  AND NOT EOF#x  files$(line)+=CHR$(chr) ELSE line+=1
+UNTIL EOF#x
+CLOSE#x
+
+x=OPENOUT("<AreaApp$Dir>.loadlist")
+IF line>1 FOR old=1 TO line-1:BPUT#x,files$(old):NEXT
+BPUT#x,directory$
+CLOSE#x
+SYS"OS_File",18,"<AreaApp$Dir>.loadlist",&FFF
+
+ENDPROC
+
+DEF PROCclick
+
+SYS"Wimp_GetPointerInfo",,pb
+IF pb!12>0 PROCnot_menu:ENDPROC
+CASE pb!16 OF
+   WHEN iconbaricon
+      CASE pb!8 OF
+      WHEN 4 : PROCstart
+      WHEN 2 : PROCopenmenu(sel,!pb-60,((ici%*45)+96))
+      WHEN 1 : REM PROCstartcorrect
+      ENDCASE
+   ENDCASE
+
+ENDPROC
+
+DEF PROCreopen
+PROCopen(view%)
+ENDPROC
+
+DEF PROCsplit(split$)
+dot=0:stop=-1
+REPEAT
+dot=INSTR(split$,".",dot+1)
+
+IF dot<>0 stop=dot
+UNTIL dot=0
+path$=LEFT$(split$,(stop-1))
+name$=RIGHT$(split$,(LEN(split$)-stop))
+
+ENDPROC
+
+DEF PROCreporterror(flags,text$,terminal)
+REM MODE0:@%="2314":REPORT:PRINT"    ":PRINTERL:END
+!eb=ERR
+CASE ERR OF
+
+      WHEN &C1,&108C2,&108C9,&108D5 : terminal=0:obj_found=0
+      ENDCASE
+IF terminal text$=text$+" ("+int$+" "+STR$(ERL)+")"+cont$+STR$~(ERR)
+$(eb+4)=text$
+SYS"Wimp_ReportError",eb,flags,"DAA" TO ,err_result
+IF terminal AND err_result=2 PROCquit
+PROCpoll
+ENDPROC
+
+DEF PROCtell(tell$)
+PROCreporterror(%10010,tell$,FALSE)
+ENDPROC
+
+DEF PROCstart
+IF sprite_loaded=FALSE THEN
+   SYS"Hourglass_On"
+   PROCintro_screen
+   SYS"Hourglass_Off"
+   filename$="DAA"
+   ENDIF
+
+!gws%=main%
+SYS"Wimp_GetWindowState",,gws%
+
+IF first_open%=TRUE THEN
+   gws%!4=(FNscreen_x/2)-win_width%/2
+   gws%!8=(FNscreen_y/2)-win_height%/2
+   gws%!12=gws%!4+win_width%
+   gws%!16=gws%!8+win_height%
+   first_open%=FALSE
+   ENDIF
+gws%!28=-1
+SYS"Wimp_OpenWindow",,gws% : REM open main
+REM !gws%=main%
+REM SYS"Wimp_GetWindowState",,gws%
+wwmin_y=gws%!8:wwmax_y=gws%!16
+gws%!4=gws%!4-178
+IF gws%!4<0 AND (gws%!4+178)>=0 gws%!4=0
+IF (gws%!4+178)<0 gws%!4=gws%!4+178
+!gws%=tools%
+gws%!16=wwmax_y
+gws%!8=gws%!8-368
+q%!28=-1
+
+REM q%!28=tools%
+IF toolbox%<>0 SYS"Wimp_OpenWindow",,gws%
+PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+PROCredraw(main%,TRUE)
+
+REM q%!28=tools%
+REM SYS"Wimp_OpenWindow",,q%
+
+ENDPROC
+
+DEF PROCstartcorrect
+!q%=close%
+SYS"Wimp_GetWindowInfo",,q%
+SYS"Wimp_OpenWindow",,q%
+ENDPROC
+
+
+DEF PROCopenw(windy%)
+!ow%=windy%
+SYS"Wimp_GetWindowInfo",,ow%
+IF windy%<>main% ow%!28=-1
+SYS"Wimp_OpenWindow",,ow%
+ENDPROC
+
+DEF PROCstart_tools
+IF toolbox%=0 ENDPROC
+!q%=tools%
+SYS"Wimp_GetWindowInfo",,q%
+!gws%=main%
+SYS"Wimp_GetWindowInfo",,gws%
+q%!4=gws%!4-178:REM 88 IF q%!4<=0 q%!4=0
+IF q%!4<=0 q%!4=0
+q%!12=gws%!4
+q%!8=q%!16-552-88
+q%!16=gws%!16
+REM q%!28=main%:REM -1
+
+SYS"Wimp_OpenWindow",,q%
+ENDPROC
+
+DEF PROCstart_tools1
+!q%=main%
+SYS"Wimp_GetWindowState",,q%
+q%!28=-1
+SYS"Wimp_OpenWindow",,q%
+ENDPROC
+
+DEF PROCredraw(handle%,draw_spr%)
+!q%=handle%
+SYS"Wimp_RedrawWindow",,q% TO more%
+PROCinfo(q%+4)
+WHILE more%
+      CASE handle% OF
+           WHEN main% :
+
+                PROCplot_sprite(bx%,by%)
+           WHEN colours% :
+                PROCdraw_colours
+           ENDCASE
+
+      SYS"Wimp_GetRectangle",,q% TO more%
+      ENDWHILE
+ENDPROC
+
+DEF PROCnot_menu
+
+CASE pb!12 OF
+     WHEN main%
+          REM V.4:P.TAB(0,0);rb%!8:V.5
+          CASE rb%!8 OF
+               WHEN 4*256 : IF picking PROCpick_colour
+               WHEN 4 : PROCflood
+                        PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+               WHEN 2 : PROCopenmenu(main,!pb-64,pb!4)
+               WHEN 16 : dminx=!rb%
+                         dminy=rb%!4
+                         doldx=dminx
+                         doldy=dminy
+                         loldx=dminx
+                         loldy=dminy
+                         PROCdrag
+               ENDCASE
+
+      WHEN tools%
+
+           CASE pb!16 OF
+
+               WHEN 0 : IF pb!8<>2 PROCopenw(title%):PROCgainc(title%,1)
+               WHEN 1 : PROCcalib_click
+               WHEN 2 : PROCget_basic_types:PROCcut_click
+               WHEN 3 : PROCget_basic_types:PROCfill_click
+               WHEN 4 : PROCget_basic_types:IF pb!8<>2 PROCopenw(calc%):PROCopenw(total%)
+               WHEN 5 : PROCget_basic_types:PROCprint
+               WHEN 6 : PROCget_basic_types:PROCopen_data_win:REM PROCopenw(save_data%)
+               WHEN 7 : PROCopen_mag_win
+               WHEN 8 : PROCopen_colours
+               ENDCASE
+
+      WHEN title%
+
+           CASE pb!16 OF
+               REM scl=VAL($FNiconstate(title%,7))
+               WHEN 8 : job$=$FNiconstate(title%,1)
+                        title$=$FNiconstate(title%,4)
+                        chain$=$FNiconstate(title%,5)
+                        !cl=title%:REM PROCclose(cl)
+                        PROCsave_title(job$,title$,chain$)
+               ENDCASE
+
+      WHEN area%
+
+           CASE pb!16 OF
+
+               WHEN 3 : PROCget_known_area
+
+               ENDCASE
+
+
+
+     WHEN total%
+
+          CASE pb!16 OF
+
+              WHEN 6 : PROCprint
+                       IF rb%!8=1 PROCclose_totals
+              ENDCASE
+
+     WHEN opt%
+
+          CASE pb!16 OF
+              WHEN 11
+                   PROCinc_dec(opt%,2,-250,250,pb!8,+1)
+              WHEN 12
+                   PROCinc_dec(opt%,2,-250,250,pb!8,-1)
+              WHEN 13
+                   PROCinc_dec(opt%,4,0,15,pb!8,+1)
+              WHEN 14
+                   PROCinc_dec(opt%,4,0,15,pb!8,-1)
+              WHEN 18
+                   IF sprite_loaded=TRUE THEN
+                       IF pal_bpp%<>4 PROCtell(pcol$)
+                       PROCread_palette
+                       PROCopenw_as_menu(colours%,!rb%,rb%!4)
+                       ELSE
+                       PROCtell(Mpal$)
+                       ENDIF
+
+              WHEN 5 : PROCoptsel:PROCsaveoptions:PROCupdate_values
+              WHEN 6 : !cl=opt%:PROCclose(cl)
+              WHEN 7 : PROCoptsel:PROCupdate_values
+
+              ENDCASE
+
+     WHEN zoom%
+
+          CASE pb!16 OF
+
+              WHEN 2 : PROCnum(1) :PROCresizewindow
+              WHEN 3 : PROCnum(-1):PROCresizewindow
+              WHEN 4 : PROCden(1) :PROCresizewindow
+              WHEN 5 : PROCden(-1):PROCresizewindow
+              ENDCASE
+
+     WHEN save_image%
+          CASE pb!16 OF
+               WHEN 2
+                    CASE rb%!8 OF
+                         WHEN 64,16 : PROCdrag_icon(save_image%,"file_ff9")
+                         ENDCASE
+               WHEN 0 : PROCsave_image2(TRUE)
+               ENDCASE
+
+     WHEN save_data%
+          CASE pb!16 OF
+               WHEN 4 : append=NOT(append)
+               WHEN 2
+                    CASE rb%!8 OF
+                         WHEN 64,14 : PROCdrag_icon(save_data%,"file_dfe")
+                         ENDCASE
+               WHEN 0 : PROCsave_results2:IF pb!8<>1 SYS"Wimp_CreateMenu",,-1
+                     ENDCASE
+     WHEN scale_win%
+          per_scale%=VAL($FNiconstate(scale_win%,1))
+          CASE pb!16 OF
+               WHEN 3 : PROCinc_dec(scale_win%,1,1,999,pb!8,1)
+               WHEN 2 : PROCinc_dec(scale_win%,1,1,999,pb!8,-1)
+               WHEN 5 : PROCseticonstate(scale_win%,1,"50")
+                        per_scale%=50
+                        SYS"Wimp_SetCaretPosition",scale_win%,1,,,-1,2
+               WHEN 6 : PROCseticonstate(scale_win%,1,"100")
+                        per_scale%=100
+                        SYS"Wimp_SetCaretPosition",scale_win%,1,,,-1,3
+               WHEN 7 : PROCseticonstate(scale_win%,1,"200")
+                        per_scale%=200
+                        SYS"Wimp_SetCaretPosition",scale_win%,1,,,-1,3
+               WHEN 8 : PROCseticonstate(scale_win%,1,"300")
+                        per_scale%=300
+                        SYS"Wimp_SetCaretPosition",scale_win%,1,,,-1,3
+               WHEN 9 : per_scale%=!my_scale%
+                        SYS"Wimp_CreateMenu",,-1
+               WHEN 10: per_scale%=VAL($FNiconstate(scale_win%,1))
+                        scale%=per_scale%
+                        IF pb!8<>1 SYS"Wimp_CreateMenu",,-1
+                        !my_scale%=scale%:my_scale%!8=100
+                        my_scale%!4=scale%:my_scale%!12=100
+                        PROCresizewindow
+               ENDCASE
+     WHEN close%
+          CASE pb!16 OF
+               WHEN 2 : PROCclosew(close%):path$=oldpath$
+               WHEN 0 : IF came_from=0 PROCsave_image1 ELSE PROCsave_image3(flag)
+                        PROCclosew(close%):path$=oldpath$
+               ENDCASE
+
+     WHEN colours%
+          CASE pb!16 OF
+               WHEN 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 : PROCselect_colour(pb!16)
+               WHEN 16 : PROCpick_from_sprite:SYS"Wimp_CreateMenu",,-1
+               WHEN 17 : SYS"Wimp_CreateMenu",,-1
+               WHEN 18 : l_col%=s_col%:PROCset_toolbox:SYS"Wimp_CreateMenu",,-1
+               ENDCASE
+
+     ENDCASE
+
+ENDPROC
+
+DEF PROCinit_spr_area(file$)
+
+SYS"OS_File",5,file$ TO obj_found
+
+CASE obj_found OF
+     WHEN 0 :
+              PROCreporterror(%10001,"'"+file$+"' "+notfound$,FALSE)
+              ENDPROC
+     ENDCASE
+very_temp=OPENIN(file$):CLOSE#very_temp
+intro=FALSE
+sprite_name$=""
+IF res%=TRUE PROCclr_results
+REM IF sprite_loaded=TRUE PROCdisclaim_mod(sp)
+PROCsplit(file$)
+filelength=FNgetfilelength(path$,name$)+4096
+REM V.4:P.TAB(0,1);path$,name$
+sp=FNclaim_mod(filelength)
+IF nabbed=FALSE ENDPROC
+PROCseticonstate(save_image%,1,file$)
+!sp=filelength
+sp!4=0
+sp!8=16
+SYS&2E,9+256,sp
+spr$=sprite_name$:last_sprite$=spr$
+
+SYS"Hourglass_On"
+SYS&2E,10+256,sp,file$
+SYS"Hourglass_Off"
+
+SYS&2E,13+256,sp,sprite_name%,128,1 TO ,,,name_length%
+FOR x=0 TO name_length%-1
+sprite_name$+=CHR$(sprite_name%?x)
+NEXT
+spr$=sprite_name$
+
+SYS&2E,37+256,sp,spr$,-1 TO ,,,pal_size%,pal_ptr%,pal_mode%
+
+SYS"OS_ReadModeVariable",pal_mode%,9 TO ,,pal_bpp%
+pal_bpp%=2^pal_bpp%
+IF pal_size%=0 AND pal_bpp%=4 PROCcreate_palette(TRUE)
+IF pal_bpp%=4 PROCset_daa_cols
+
+REM IF pal_size%=0 PROCtell("no palette") ELSE PROCtell("palette")
+
+IF zise=0 THEN
+   SYS &2E,256+62,sp,spr$ TO ,,,zise
+   DIM sarea zise
+   ENDIF
+!sarea=0
+
+REM SYS&35,spr_mode,9 TO ,,bpp
+REM bpp=2^bpp
+REM IF bpp>8 PROCdisclaim_mod(sp):PROCintro_screen
+
+PROCget_spr_size
+
+ENDPROC
+
+DEF PROCplot_sprite(spr_xpos,spr_ypos)
+PROCreadpixtrans
+REM V.4:P.TAB(0,0);bpp
+IF bpp<>4 anti_a=0 ELSE anti_a=anti
+IF no_grey%=TRUE anti_a=0
+SYS"OS_SpriteOp",52+anti_a+256,sp,spr$,spr_xpos,spr_ypos,0,pl_scale%,trans%
+ENDPROC
+
+DEF PROCget_spr_size
+
+SYS&2E,40+256,sp,spr$ TO ,,,spr_width,spr_height,mask_status,spr_mode
+SYS&35,spr_mode,4 TO ,,x_mul
+SYS&35,spr_mode,5 TO ,,y_mul
+SYS&35,spr_mode,3 TO ,,mlog_col
+SYS&35,spr_mode,9 TO ,,bpp
+bpp=2^bpp
+
+x_mul=2^x_mul
+y_mul=2^y_mul
+x_mul=x_mul*(!my_scale%/my_scale%!8)
+y_mul=y_mul*(my_scale%!4/my_scale%!12)
+PROCsetextent(spr_width*x_mul,spr_height*y_mul)
+ENDPROC
+
+DEF PROCsetextent(new_width,new_height)
+
+!se%=0
+se%!4=-1024
+se%!8=(new_width)
+se%!12=(new_height)-1024
+win_width%=se%!8-se%!0
+win_height%=se%!12-se%!4
+SYS"Wimp_SetExtent",main%,se%
+ENDPROC
+
+DEF PROCflood
+IF picking ENDPROC
+PROCreadpixtrans
+IF NOT calibrating AND NOT filling AND NOT cutting AND pb!8<>1 ENDPROC
+IF NOT calibrating AND pb!8<>1 AND (known_area=0 OR calib%=0) ENDPROC
+IF known_area=0 PROCnot_known:ENDPROC
+IF cutting AND current_cut>30  PROCtell(maxi$):ENDPROC
+IF filling AND current_fill>30 PROCtell(maxi$):ENDPROC
+IF mlog_col<>15 PROCtell(mode$):ENDPROC
+cx=!pb
+cy=pb!4
+!gws%=main%
+SYS"Wimp_GetWindowInfo",,gws%
+ox=gws%!4-gws%!20
+oy=gws%!8-(1024+gws%!24)+(gws%!16-gws%!8)
+
+flood_x=(cx-ox)
+flood_y=(cy-oy)
+
+SYS&2E,60+256,sp,spr$,sarea TO r0,r1,r2,r3
+
+IF pb!8=4 THEN
+
+GCOL0,11:FILL flood_x*(my_scale%!8/!my_scale%),flood_y*(my_scale%!12/my_scale%!4)
+ELSE
+
+    IF pb!8=1 THEN
+
+        IF INKEY(-1) GCOL0,0 ELSE GCOL0,l_col%
+
+        POINT flood_x*(my_scale%!8/!my_scale%),flood_y*(my_scale%!12/my_scale%!4)
+        ENDIF
+ENDIF
+
+SYS &2E,r0,r1,r2,r3
+
+IF pb!8=4 THEN
+
+   PROCredraw(main%,TRUE)
+   PROCcode
+   CALL page
+   PROCprocess(!pixels)
+
+ENDIF
+
+PROCredraw(main%,TRUE)
+ENDPROC
+
+DEF PROCread_slot_size
+SYS"Wimp_SlotSize",-1,-1 TO min_slot%
+ENDPROC
+
+DEF FNclaim_mod(bytes)
+REM VDU4:PRINTTAB(0,0);bytes
+SYS"Wimp_SlotSize",-1,-1 TO old_slot%
+
+SYS"Wimp_SlotSize",(min_slot%)+bytes,-1
+SYS"Wimp_SlotSize",-1,-1 TO setto
+IF setto<(min_slot%+bytes) THEN
+     nabbed=FALSE
+     SYS"Wimp_SlotSize",old_slot%,-1
+
+     PROCtell(room$)
+     ELSE
+     nabbed=TRUE
+     ENDIF
+
+=HIMEM
+
+DEF PROCdisclaim_mod(blok)
+SYS"Wimp_SlotSize",min_slot%,-1
+ENDPROC
+
+DEF FNgetfilelength(path$,file$)
+SYS"OS_File",13,path$+"."+file$,,,"" TO ,,,,file_len
+=file_len
+
+
+DEF PROCcode
+ssp=13:link=14
+REM (f_col*&10)+f_col : REM &xx
+
+REM define the words to set pixels as
+
+s_col1=(f_col*&10)+f_col   : REM &ff - both fg
+s_col2=(f_col*&10)+l_col%  : REM &fl - fg,line
+s_col3=(l_col%*&10)+f_col  : REM &lf - line,fg
+
+REM the words we're checking for
+
+test_cl1=&BB                   : REM &BB - both red
+test_cl2=(&B0)+l_col%          : REM &Bx - red line
+test_cl3=(l_col%*&10)+&B       : REM &xB - line red
+
+REM our memory area
+
+
+FOR apass=0 TO 2 STEP2
+P%=page
+[ OPT apass
+STMFD (ssp)!,{link}          ; store the entry point
+.min EQUD sp : ALIGN         ; start of sprite memory
+.max EQUD (sp+(sp!16)):ALIGN ; end of sprite memory
+
+.test1 EQUD s_col1           ; load the colours
+.test2 EQUD s_col2           ; to set after the colour
+.test3 EQUD s_col3           ; has been found
+
+.testl1 EQUD test_cl1        ; load the colours
+.testl2 EQUD test_cl2        ; to search for within
+.testl3 EQUD test_cl3        ; min and max
+
+.line1 EQUD l_col%           ; Don't think this gets used
+.dummy  EQUD 0
+.pixels EQUD 0               ; Initialise count
+
+LDR R8,min                   ; R8 is our current pixel
+ADD R8,R8,#190               ; Add 190 to jump over sprite data
+LDR R6,min                   ; ?
+LDR R7,max                   ; ?
+ADD R7,R7,#10                ; ?
+
+
+MOV R0,#0                    ; Initialise
+MOV R1,#0                    ; r0 AND r1 and
+STR R1,pixels                ; store them in pixels
+STR R1,dummy                 ; and dummy
+
+.loop                        ; start of loop
+
+LDRB R0,[R8],#0              ; load r0 with what's at R8
+
+LDR  R5,testl1               ; load R5 with 1st test case (red-red)
+CMP R0,R5                    ; compare the two
+LDREQ R0,test1               ; if equal, load r0 with fg-fg
+BEQ over
+
+LDR R5,testl2                ; load r5 with 2nd test case (red-line)
+CMPNE R0,R5                  ; compare the two
+LDREQ R0,test2               ; if equal, load r0 with TBA
+BEQ over
+
+LDR R5,testl3                ; load r5 with 3rd test case (line-red)
+CMPNE R0,R5                  ; compare
+LDREQ R0,test3               ; if equal, load r0 with TBA
+
+.over
+LDR R1,pixels                ; load r1 with pixels counted so far
+ADDEQ R1,R1,#1               ; inc r1 if any of above true
+STR R1,pixels                ; and store (streq would be better)
+STRB R0,[R8],#1              ; store colour in r0 at r8 and inc r8
+CMP R8,R7                    ; have we finished?
+BLE loop                     ; if not, loop
+STR R1,pixels                ; store r1 at !pixels
+LDMFD (ssp)!,{pc}            ; restore entrypoint
+
+]
+NEXT
+ENDPROC
+
+DEF PROCsetupmenus
+SYS"Wimp_GetPointerInfo",,pb
+x%=!pb:y%=pb!4
+PROCcutmenu
+PROCsubmenu3
+PROCsubmenu2
+PROCmainmenu
+PROCiconmenus
+ENDPROC
+
+DEF PROCiconmenus
+PROCoptionsmenu
+REM item$(1)=M000$+"{info%}"
+item$(1)=M000$+"{"+STR$(info%)+"}"
+item$(2)=M001$
+item$(3)=M002$
+ici%=3 : REM no. of items in icon menu
+sel=FNmenu(T000$,3,180)
+ENDPROC
+
+DEF PROCoptionsmenu
+item$(1)="Option 1"
+item$(2)="-Reserved"
+options%=FNmenu("Options",2,150)
+ENDPROC
+
+DEF PROCmainmenu
+
+item$(1)="/^"+M100$+"{"+STR$(cutmenu)+"}"
+item$(2)="/^"+M101$+"{"+STR$(fillmenu)+"}"
+item$(3)=""+M102$
+item$(4)=":"+M103$
+
+item$(5)=M1010$
+REM item$(6)=""+M106$
+REM item$(7)=M104$+"{"+STR$(save_data%)+"}"
+REM item$(8)=":"+M105$
+REM 15.10.97
+item$(8)=""+M106$
+item$(6)=M104$+"{"+STR$(save_data%)+"}"
+item$(7)=":"+M105$
+
+item$(9)=M107$+"{"+STR$(submenu3)+"}"
+REM item$(10)=M107$
+item$(10)=M108$+"{"+STR$(scale_win%)+"}"
+item$(11)=M109$+"{"+STR$(save_image%)+"}"
+
+REM item$(4)=":"+M106$+"{"+STR$(save_image%)+"}"
+REM item$(5)=M103$+"{"+STR$(submenu3)+"}"
+REM item$(6)=M104$
+REM item$(7)=M105$+"{"+STR$(scale_win%)+"}"
+
+main=FNmenu(T000$,11,200)
+
+ENDPROC
+
+DEF PROCcutmenu
+item$(1)="^"+cuttype$(0):REM Unsuitable
+item$(2)="^"+cuttype$(1):REM Rock
+item$(3)="^"+cuttype$(2):REM Topsoil
+item$(4)="^"+cuttype$(3):REM Sand
+item$(5)="^"+cuttype$(4)
+
+cutmenu=FNmenu(T200$,5,200)
+ENDPROC
+
+DEF PROCsubmenu3
+item$(1)=M400$
+submenu3=FNmenu(T400$,1,220)
+ENDPROC
+
+DEF PROCsubmenu2
+item$(1)="^"+filltype$(0):REM 600mm Rock
+item$(2)="^"+filltype$(1):REM Suitable
+item$(3)="^"+filltype$(2):REM above OGL
+item$(4)="^"+filltype$(3):REM inc T/S
+item$(5)="^"+filltype$(4)
+fillmenu=FNmenu(T300$,5,200)
+ENDPROC
+
+DEF PROCmenuselect
+
+REM decode the menu returned
+REM dot-separated list returned in ans
+
+SYS"Wimp_DecodeMenu",,lastmenu%,rb%,ans
+
+REM Change the area1 and area2 types
+
+CASE lastmenu% OF
+     WHEN main
+     PROCget_basic_types
+     ENDCASE
+
+
+PROCmenu_decoded($ans)
+SYS"Wimp_GetPointerInfo",,pb
+IF pb!8=1 SYS"Wimp_CreateMenu",,lastmenu%
+ENDPROC
+
+DEF PROCopenmenu(menuhandle,x,y)
+SYS"Wimp_CreateMenu",,menuhandle,x,y
+lastmenu%=menuhandle
+ENDPROC
+
+DEF FNmenu(mtitle$,no_of_items%,width%)
+item=1
+DIM menub &200
+
+
+LOCAL menudata
+
+REM symbols:
+
+REM : : dotted line follows
+REM / : tick
+REM ^ : writeable
+REM - : shaded
+
+SYS"Wimp_GetPointerInfo",,pb
+
+$(menub)=mtitle$
+menub!12=7
+menub!13=2
+menub!14=7
+menub!15=0
+menub!16=width%
+menub!20=44:REM Standard height
+menub!24=0 :REM gap
+
+menudata=menub+28
+
+REPEAT
+
+!menudata=%00000000000000000000000
+menudata!4=-1
+menudata!8=%00000111000000001001010100110001
+REM menudata!8=    %00000000000000001001010101110001
+REM SYS"Font_FindFont",,"Homerton.Medium",14*14,14*14,0,0 TO fh
+REM menudata!8=menudata!8 OR (fh<<24)
+
+REM menudata!8=%00001111000000001001010101110001
+menudata!12=%101
+REPEAT
+IF RIGHT$(item$(item),1)="}" THEN
+   pos1=INSTR(item$(item),"{")
+   submenu$=MID$(item$(item),pos1+1,(LEN(item$(item))-1-pos1))
+
+   item$(item)=LEFT$(item$(item),pos1-1)
+   submenu%=TRUE
+   change=TRUE
+   ENDIF
+
+bit$=LEFT$(item$(item),1)
+CASE bit$ OF
+   WHEN "/" : tick%=TRUE
+   WHEN ":" : dotted%=TRUE
+   WHEN "^" : writeable%=TRUE
+   WHEN "-" : shaded%=TRUE
+OTHERWISE
+   change=FALSE
+   ENDCASE
+
+IF change item$(item)=RIGHT$(item$(item),LEN(item$(item))-1)
+IF tick% !menudata=!menudata OR %1
+IF dotted% !menudata=!menudata OR %10
+IF writeable% !menudata=!menudata OR %100
+IF shaded% menudata!8=menudata!8 OR %10000000000000000000000
+
+
+IF submenu% menudata!4=VAL(submenu$):IF menudata!4=scale_win% !menudata=!menudata OR %1000
+
+
+IF item=no_of_items% !menudata=!menudata OR %10000000:item=no_of_items%
+UNTIL change=FALSE
+
+DIM test 24
+$test=item$(item)
+menudata!12=test
+
+menudata!16=valid
+menudata!20=10000
+menudata+=24
+tick%=FALSE
+dotted%=FALSE
+writeable%=FALSE
+shaded%=FALSE
+submenu%=FALSE
+change=TRUE
+
+item+=1
+UNTIL item$(item)=""
+=menub
+
+DEF PROCmenu_decoded(list$)
+SYS"Wimp_GetPointerInfo",,pb
+CASE list$ OF
+   WHEN M002$ : PROCquit
+   WHEN M001$ : PROCopt_open
+   WHEN M100$ : PROCsimpcut:PROCtool_select(0,1,0):cut_sel=0
+   WHEN M101$ : PROCsimpfill:PROCtool_select(0,0,1):fill_sel=0
+   WHEN M107$ : IF intro=FALSE THEN
+                    res%=TRUE
+                    PROCinit_spr_area(dir$)
+                    PROCstart
+                    ENDIF
+   WHEN M107$+"."+M400$ : IF intro=FALSE THEN
+                    res%=FALSE
+                    PROCinit_spr_area(dir$)
+                    PROCstart
+                    ENDIF
+   WHEN M102$ : PROCcalib_menu_click
+   WHEN M103$ : PROCsave_types
+   WHEN M104$ : save_file$=FNextract(FNiconstate(save_data%,1))
+                CASE INSTR(save_file$,".") OF
+                     WHEN 0 : PROCopenw_as_menu(save_data%,!pb,pb!4)
+                OTHERWISE
+                     PROCsave_results2
+                     ENDCASE
+   WHEN M105$ : PROCprint
+   WHEN M106$ : PROCopenw(calc%):PROCopenw(total%)
+   WHEN M108$ : PROCopenw_as_menu(scale_win%,!pb,pb!4)
+   WHEN M109$ : save_file$=FNextract(FNiconstate(save_data%,1))
+                CASE INSTR(save_file$,".") OF
+                     WHEN 0 : PROCopenw_as_menu(save_image%,!pb,pb!4)
+                OTHERWISE
+                PROCsave_image2(FALSE)
+                ENDCASE
+   WHEN M1010$ : PROCopenw(title%):PROCgainc(title%,1)
+   ENDCASE
+
+REM IF INSTR(list$,"Cut.") PROCgetcuttype:PROCtool_select(0,1,0)
+REM IF INSTR(list$,"Fill.") PROCgetfilltype:PROCtool_select(0,0,1)
+IF INSTR(list$,M100$+".") PROCgetcuttype:PROCtool_select(0,1,0)
+IF INSTR(list$,M101$+".") PROCgetfilltype:PROCtool_select(0,0,1)
+ENDPROC
+
+DEF PROCtool_select(ta,tb,tc)
+PROCpseudo_click(tools%,1,ta)
+PROCpseudo_click(tools%,2,tb)
+PROCpseudo_click(tools%,3,tc)
+IF tb pb!8=4:PROCcut_click ELSE IF tc pb!8=4:PROCfill_click
+
+ENDPROC
+
+DEF PROCseticonstate(windy%,icN%,tExt$)
+$FNiconstate(windy%,icN%)=tExt$
+PROCupdate(windy%,icN%)
+ENDPROC
+
+DEF FNiconstate(winno%,icno%)
+!icon_state%=winno%
+icon_state%!4=icno%
+SYS"Wimp_GetIconState",,icon_state%
+=icon_state%!28
+
+DEF PROCgainc(windy%,icno%)
+SYS"Wimp_SetCaretPosition",windy%,icno%,,,-1,LEN($FNiconstate(windy%,icno%))
+ENDPROC
+
+DEF PROCgaincret(rb%)
+SYS"Wimp_SetCaretPosition",!rb%,rb%!4,rb%!8,rb%!12,rb%!16,rb%!20
+ENDPROC
+
+DEF PROCchtitle(windy%,new$):ENDPROC
+!gwi=windy%
+SYS"Wimp_GetWindowInfo",,gwi
+$(gwi+76)=new$
+ENDPROC
+
+DEF PROCget_known_area
+known_area=VAL($FNiconstate(area%,1))
+IF known_area=0 PROCpseudo_click(area%,3,0):PROCno_area:ENDPROC
+PROCclosew(area%)
+ENDPROC
+
+DEF PROCclosew(windy%)
+!cl=windy%
+SYS"Wimp_CloseWindow",,cl
+ENDPROC
+
+DEF PROCprocess(pixels%)
+IF calibrating calib%=pixels% : PROCseticonstate(count%,1,STR$(calib%)):current_calib=2
+IF known_area=0 PROCno_area:ENDPROC
+IF calib%=0 PROCtell(cal0$):ENDPROC
+IF cutting THEN
+   cut=((pixels%/calib%)*known_area)
+   REM PROCseticonstate(count%,3,STR$(cut*(1+(error_correct%/100)))) 06.06.97
+   PROCseticonstate(count%,3,STR$(cut))
+   PROCseticonstate(calc%,current_cut,STR$(cut*(1+(error_correct%/100))))
+   PROCupdate(calc%,current_cut)
+   cut(current_cut)=cut
+   current_cut+=1
+
+   ENDIF
+
+IF filling THEN
+   fill=((pixels%/calib%)*known_area)
+   PROCseticonstate(count%,5,STR$(fill))
+   PROCseticonstate(calc%,current_fill+30,STR$(fill*(1+(error_correct%/100))))
+   PROCupdate(calc%,current_fill+30)
+   fill(current_fill)=fill
+   current_fill+=1
+
+   ENDIF
+IF NOT calibrating PROCsum
+ENDPROC
+
+DEF PROCsum
+total_cut=0:total_fill=0
+FOR sum=1 TO 30
+total_cut+=cut(sum)
+total_fill+=fill(sum)
+NEXT
+PROCseticonstate(total%,2,STR$(total_cut*(1+(error_correct%/100))))
+PROCseticonstate(total%,3,STR$(total_fill*(1+(error_correct%/100))))
+PROCupdate(total%,2)
+PROCupdate(total%,3)
+ENDPROC
+
+DEF PROCcalib_click
+REM cur_title$=FNget_title(main%)
+REM IF tinfo>0 cur_title$=LEFT$(cur_title$,LEN(cur_title$)-LEN(Tinfo$(tinfo)))
+REM curr_tool=1
+CASE pb!8 OF
+    WHEN 4 : calibrating=TRUE
+           :cutting=FALSE
+           :filling=FALSE
+           :PROCopenw(area%)
+           :PROCgainc(area%,1)
+           :f_col=&8
+           :tinfo=1
+    WHEN 1 : IF calibrating=FALSE THEN
+                calibrating=TRUE
+                cutting=FALSE
+                filling=FALSE
+                PROCopenw(area%)
+                PROCgainc(area%,1)
+                f_col=&8
+                tinfo=1
+             ELSE
+                calibrating=FALSE
+                tinfo=0
+                ENDIF
+
+             ENDCASE
+
+IF current_cut>1 OR current_fill>1 OR current_calib>1 THEN add$=" *" ELSE add$=""
+REM PROCset_title(main%,cur_title$+Tinfo$(tinfo)+add$)
+PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+ENDPROC
+
+DEF PROCcalib_menu_click
+cur_title$=FNget_title(main%)
+IF tinfo>0 cur_title$=LEFT$(cur_title$,LEN(cur_title$)-LEN(Tinfo$(tinfo)))
+
+calibrating=TRUE
+cutting=FALSE
+filling=FALSE
+PROCopenw(area%)
+PROCgainc(area%,1)
+f_col=&8
+PROCpseudo_click(tools%,1,1)
+PROCpseudo_click(tools%,2,0)
+PROCpseudo_click(tools%,3,0)
+tinfo=1
+REM PROCset_title(main%,FNget_title(main%)+Tinfo$(tinfo))
+PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+ENDPROC
+
+
+DEF PROCcut_click
+cur_title$=FNget_title(main%)
+IF tinfo>0 cur_title$=LEFT$(cur_title$,LEN(cur_title$)-LEN(Tinfo$(tinfo)))
+
+CASE pb!8 OF
+    WHEN 4 : cutting=TRUE
+           :calibrating=FALSE
+           :filling=FALSE
+           :f_col=&E
+           :tinfo=2
+    WHEN 1 : IF cutting=FALSE THEN
+                cutting=TRUE
+                calibrating=FALSE
+                filling=FALSE
+                f_col=&E
+                tinfo=2
+             ELSE
+                cutting=FALSE
+                tinfo=0
+                ENDIF
+
+             ENDCASE
+REM PROCset_title(main%,cur_title$+Tinfo$(tinfo))
+Tinfo$(2)=" ("+M100$+")"
+Tinfo$(3)=" ("+M101$+")"
+PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+
+ENDPROC
+
+DEF PROCfill_click
+cur_title$=FNget_title(main%)
+IF tinfo>0 cur_title$=LEFT$(cur_title$,LEN(cur_title$)-LEN(Tinfo$(tinfo)))
+
+CASE pb!8 OF
+    WHEN 4 : filling=TRUE
+           :calibrating=FALSE
+           :cutting=FALSE
+           :f_col=&A
+           :tinfo=3
+    WHEN 1 : IF filling=FALSE THEN
+                filling=TRUE
+                calibrating=FALSE
+                cutting=FALSE
+                f_col=&A
+                tinfo=3
+             ELSE
+                filling=FALSE
+                tinfo=0
+                ENDIF
+
+             ENDCASE
+REM PROCset_title(main%,cur_title$+Tinfo$(tinfo))
+PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+ENDPROC
+
+DEF PROCno_calib
+PROCreporterror(%10010,cal1$,FALSE)
+ENDPROC
+
+DEF PROCnot_known
+PROCreporterror(%10010,cal2$,FALSE)
+ENDPROC
+
+DEF PROCno_area
+PROCreporterror(%10010,cal3$,FALSE)
+ENDPROC
+
+DEF PROCprintfr
+REM VDU7
+REM H%=OPENOUT("printer:")
+
+H%=OPENOUT(save_file$)
+
+BPUT#H%,""
+BPUT#H%,""
+BPUT#H%,STRING$(76,"=")
+BPUT#H%,TIME$
+BPUT#H%,"D.A.A. "+vers$
+BPUT#H%,"File:  "+dir$
+BPUT#H%,""
+BPUT#H%,job$
+BPUT#H%,title$
+BPUT#H%,chain$
+BPUT#H%,""
+BPUT#H%,"Area 1 defined as "+M100$+", Area 2 defined as "+M101$
+BPUT#H%,""
+
+BPUT#H%,STRING$(76,"-")
+BPUT#H%,""
+
+IF current_cut>1 THEN
+FOR pr_cut=1 TO current_cut-1
+ pr$=STR$(cut(pr_cut)*(1+(error_correct%/100)))
+ c$=STR$(pr_cut)
+ c$=LEFT$(c$,LEN(c$)-3)
+o$=areac$+"   : "+cut_type$+STRING$(32-LEN(cut_type$)," ")+STRING$((5-LEN(c$))," ")+c$+STRING$(10-LEN(pr$)," ")+pr$+" m"+CHR$(s_chr%)
+BPUT#H%,o$
+ NEXT
+
+BPUT#H%,""
+ENDIF
+
+IF current_fill>1 THEN
+FOR pr_fill=1 TO current_fill-1
+ pr$=STR$(fill(pr_fill)*(1+(error_correct%/100)))
+ c$=STR$(pr_fill)
+ c$=LEFT$(c$,LEN(c$)-3)
+o$=areaf$+"   : "+fill_type$+STRING$(32-LEN(fill_type$)," ")+STRING$((5-LEN(c$))," ")+c$+STRING$(10-LEN(pr$)," ")+pr$+" m"+CHR$(s_chr%)
+BPUT#H%,o$
+ NEXT
+ENDIF
+
+BPUT#H%,""
+BPUT#H%,""
+pr$=STR$(total_cut*(1+(error_correct%/100)))
+o$=tcut1$+" : "+cut_type$+STRING$(37-LEN(cut_type$)," ")+STRING$(10-LEN(pr$)," ")+pr$+" m"+CHR$(s_chr%)
+BPUT#H%,o$
+pr$=STR$(total_fill*(1+(error_correct%/100)))
+o$=tfill1$+" : "+fill_type$+STRING$(37-LEN(fill_type$)," ")+STRING$(10-LEN(pr$)," ")+pr$+" m"+CHR$(s_chr%)
+BPUT#H%,o$
+
+BPUT#H%,""
+BPUT#H%,STRING$(76,"=")
+BPUT#H%,""
+
+CLOSE#H%
+ENDPROC
+
+DEF PROCclr_results
+FOR cle=1 TO 30
+cut(cle)=0
+fill(cle)=0
+PROCseticonstate(calc%,cle,"")
+PROCseticonstate(calc%,cle+30,"")
+NEXT
+total_fill=0
+total_cut=0
+current_cut=1
+current_fill=1
+current_calib=1
+PROCseticonstate(total%,2,"0.00")
+PROCseticonstate(total%,3,"0.00")
+ENDPROC
+
+DEF PROCupdate(win_up%,ic_up%)
+!set=win_up%
+set!4=ic_up%
+set!8=0
+set!12=0
+SYS"Wimp_SetIconState",,set
+ENDPROC
+
+DEF PROCgetcuttype
+REM V.4:P.TAB(0,0);list$:V.5
+posn=INSTR(list$,".",0)
+area1_type$=LEFT$(list$,posn-1)
+REM M100$=area1_type$
+REM V.4:P.TAB(0,0);area1_type$:V.5
+cut_type$=RIGHT$(list$,LEN(list$)-posn)
+PROCseticonstate(total%,7,cut_type$)
+PROCsetmenutick(cutmenu,rb%!4)
+cut_sel=(rb%!4)+1
+cuttype$(rb%!4)=cut_type$
+IF main?28 AND 1 main?28=main?28 EOR 1
+ENDPROC
+
+DEF PROCgetfilltype
+posn=INSTR(list$,".",0)
+fill_type$=RIGHT$(list$,LEN(list$)-posn)
+PROCseticonstate(total%,8,fill_type$)
+PROCsetmenutick(fillmenu,rb%!4)
+fill_sel=(rb%!4)+1
+filltype$(rb%!4)=fill_type$
+IF main?(28+24) AND 1 main?(28+24)=main?(28+24) EOR 1
+ENDPROC
+
+DEF PROCsetmenutick(menu_t%,item_t%)
+PROCclearmenuticks(menu_t%)
+menu_t%?(28+(24*item_t%))=menu_t%?(28+(24*item_t%)) EOR 1
+ENDPROC
+
+DEF PROCclearmenuticks(menu_t%)
+FOR clear_t%=0 TO 4
+IF menu_t%?(28+(24*clear_t%)) AND 1 menu_t%?(28+(24*clear_t%))=menu_t%?(28+(24*clear_t%)) EOR 1
+NEXT
+ENDPROC
+
+DEF PROCsimpcut
+cut_type$=""
+PROCseticonstate(total%,7,cut_type$)
+PROCclearmenuticks(cutmenu)
+IF (main?28 AND 1) ELSE main?28=main?28 EOR 1
+ENDPROC
+
+DEF PROCsimpfill
+fill_type$=""
+PROCseticonstate(total%,8,fill_type$)
+PROCclearmenuticks(fillmenu)
+IF (main?(28+24) AND 1) ELSE main?(28+24)=main?(28+24) EOR 1
+ENDPROC
+
+DEF PROCopts
+!ow%=options%
+SYS"Wimp_GetWindowState",,ow%
+ENDPROC
+
+DEF PROCoptsel
+wrong=FALSE
+line_col$=$FNiconstate(opt%,4)
+l_col%=VAL(line_col$)
+s_col%=l_col%
+at%=@%
+@%="+G10.2"
+PROCseticonstate(tools%,9,STR$(l_col%))
+@%=at%
+IF l_col%>15 THEN
+   PROCpseudo_click(opt%,7,0)
+   PROCseticonstate(opt%,4,"15")
+   SYS"Wimp_SetCaretPosition",opt%,4,,,-1,2
+   l_col%=15
+   PROC(%10010,line$,FALSE)
+   wrong=TRUE
+   ENDIF
+
+error_correct%=VAL($FNiconstate(opt%,2))
+
+
+IF wrong=FALSE !cl=opt%:PROCclose(cl)
+oldanti=anti
+anti=FNicondown(opt%,8)
+toolbox%=FNicondown(opt%,17)
+IF oldanti<>anti PROCredraw(main%,TRUE)
+IF toolbox%=0 THEN
+   PROCclosew(tools%)
+   ELSE
+   !q%=main%
+   SYS"Wimp_GetWindowState",,q%
+   IF ((q%!32 AND %10000000000000000)>>16)=1 PROCopen(q%)
+   ENDIF
+ENDPROC
+
+DEF FNicondown(!sb,sb!4)
+SYS"Wimp_GetIconState",,sb
+=((sb!24)>>21) AND 1
+
+DEF PROCloadoptions
+LOCAL ERROR
+REM  ON ERROR LOCAL:RESTORE ERROR:l_col%=7:ENDPROC
+save_options%=OPENIN("<AreaApp$Dir>.options")
+l_col%=BGET#save_options%
+s_col%=l_col%
+at%=@%
+@%="+g10.2"
+PROCseticonstate(colours%,21,STR$(s_col%))
+@%=at%
+REM s_chr%=BGET#save_options%
+REM error_correct%=BGET#save_options%
+FOR bit=0 TO 3
+   saopt%?bit=BGET#save_options%
+   NEXT
+error_correct%=!saopt%
+anti  =BGET#save_options%
+toolbox%=BGET#save_options%
+
+area1_type$=""
+IF NOT EOF#save_options% chr=BGET#save_options%
+REPEAT
+   IF chr<>0 THEN
+      area1_type$+=CHR$(chr)
+      IF NOT EOF#save_options% chr=BGET#save_options%
+      ENDIF
+   UNTIL chr=0 OR EOF#save_options%
+
+area2_type$=""
+IF NOT EOF#save_options% chr=BGET#save_options%
+REPEAT
+   IF chr<>0 THEN
+      area2_type$+=CHR$(chr)
+      IF NOT EOF#save_options% chr=BGET#save_options%
+      ENDIF
+   UNTIL chr=0 OR EOF#save_options%
+
+REM PROCseticonstate(opt%,21,area1_type$)
+
+REM PROCseticonstate(opt%,22,area2_type$)
+
+CLOSE#save_options%
+ENDPROC
+
+DEF PROCsaveoptions
+REM LOCAL ERROR
+REM ON ERROR LOCAL:RESTORE ERROR:PROCreporterror(%10010,SOPT$,FALSE):ENDPROC
+save_options%=OPENOUT("<AreaApp$Dir>.options")
+!saopt%=error_correct%
+BPUT#save_options%,l_col%
+REM BPUT#save_options%,error_correct%:REM s_chr%
+FOR bit=0 TO 3
+   BPUT#save_options%,saopt%?bit
+   NEXT
+BPUT#save_options%,anti
+BPUT#save_options%,toolbox%
+REM area1_type$=FNchop($FNiconstate(opt%,21))
+REM area2_type$=FNchop($FNiconstate(opt%,22))
+BPUT#save_options%,area1_type$
+BPUT#save_options%,&00
+BPUT#save_options%,area2_type$
+BPUT#save_options%,&00
+CLOSE#save_options%
+ENDPROC
+
+DEF PROCkeypressed
+REM V.4:P.TAB(0,0);~!rb%,~scale_win%
+REM IF rb%!24=&1B V.7
+CASE !rb% OF
+
+    WHEN title%
+
+         CASE rb%!4 OF
+              WHEN 1 : PROCjobkey
+              WHEN 4 : PROCtitlekey
+              WHEN 5 : PROCchainkey
+
+                       ENDCASE
+
+    WHEN area%
+
+         CASE rb%!24 OF
+              WHEN 13
+                   PROCpseudo_click(area%,3,1)
+                   PROCget_known_area
+                   PROCpseudo_click(area%,3,0)
+              ENDCASE
+    WHEN zoom%
+
+         CASE rb%!4 OF
+              WHEN 0 : IF rb%!24=13 PROCgainc(zoom%,1)
+              WHEN 1 : IF rb%!24=13 PROCnum(0):PROCden(0):PROCresizewindow
+                   ENDCASE
+
+    WHEN opt%
+
+         CASE rb%!4 OF
+              WHEN 4
+                   CASE rb%!24 OF
+                        WHEN 13
+                        PROCpseudo_click(opt%,7,1)
+                        PROCoptsel
+                        PROCpseudo_click(opt%,7,0)
+
+                   ENDCASE
+              ENDCASE
+
+    WHEN scale_win%
+         REM V.7
+         CASE rb%!4 OF
+              WHEN 1
+                   IF rb%!24=13 THEN
+                      PROCpseudo_click(scale_win%,10,1)
+                      per_scale%=VAL($FNiconstate(scale_win%,1))
+                      scale%=per_scale%
+                      !my_scale%=scale%:my_scale%!8=100
+                      my_scale%!4=scale%:my_scale%!12=100
+
+                      SYS"Wimp_CreateMenu",,-1
+                      PROCpseudo_click(scale_win%,10,0)
+                      PROCresizewindow
+                      ENDIF
+                   ENDCASE
+
+
+         REM ENDCASE
+
+    WHEN save_image%
+
+         CASE rb%!4 OF
+
+              WHEN 1 : IF rb%!24=13 PROCsave_image2(TRUE)
+              ENDCASE
+
+    WHEN close%
+         CASE rb%!24 OF
+              WHEN &1B,ASC"C",ASC"c",13 : PROCpseudo_click(close%,2,1)
+                                          PROCclosew(close%)
+                                          PROCpseudo_click(close%,2,0)
+              WHEN ASC"S",ASC"s" : PROCpseudo_click(close%,0,1)
+                                   IF came_from=0 PROCsave_image1 ELSE PROCsave_image3(flag)
+                                   PROCclosew(close%)
+                                   PROCpseudo_click(close%,0,0)
+
+              ENDCASE
+ENDCASE
+
+SYS"Wimp_ProcessKey",rb%!24
+
+ENDPROC
+
+DEF PROCjobkey
+CASE rb%!24 OF
+
+     WHEN 13   : PROCgainc(title%,4)
+     WHEN &18F : PROCgainc(title%,5)
+     WHEN &18E : PROCgainc(title%,4)
+     ENDCASE
+ENDPROC
+
+DEF PROCtitlekey
+
+CASE rb%!24 OF
+     WHEN 13   : PROCgainc(title%,5)
+     WHEN &18F : PROCgainc(title%,1)
+     WHEN &18E : PROCgainc(title%,5)
+     ENDCASE
+ENDPROC
+
+DEF PROCchainkey
+
+CASE rb%!24 OF
+     WHEN 13   : PROCpseudo_click(title%,8,1)
+                 job$=$FNiconstate(title%,1)
+                 title$=$FNiconstate(title%,4)
+                 chain$=$FNiconstate(title%,5)
+                 !cl=title%:PROCclose(cl)
+                 PROCpseudo_click(title%,8,0)
+                 PROCsave_title(job$,title$,chain$)
+
+     WHEN &18F : PROCgainc(title%,4)
+     WHEN &18E : PROCgainc(title%,1)
+     ENDCASE
+ENDPROC
+
+DEF PROCclose_totals
+PROCclosew(total%)
+PROCclosew(calc%)
+ENDPROC
+
+DEF PROClosecaret
+SYS"Wimp_SetCaretPosition",-1
+ENDPROC
+
+DEF PROCreadpixtrans
+
+$spnptr=spr$
+SYS"Wimp_ReadPixTrans",&100,sp,spnptr,,,,sp_scale%
+SYS"ColourTrans_SelectTable",sp,spnptr,-1,-1,trans%,%10
+
+SYS"OS_ReadModeVariable",-1,3 TO ,,max_cols%
+SYS"OS_ReadModeVariable",-1,9 TO ,,bpp%
+bpp%=2^bpp%
+
+PROCsetscale
+ENDPROC
+
+DEF PROCnum(inx%)
+num%=VAL($FNiconstate(zoom%,0))
+num%+=inx%
+IF num%>999 num%=999 ELSE IF num%<1 num%=1
+@%="F2.2"
+PROCseticonstate(zoom%,0,STR$(num%))
+@%="+F2.2"
+
+!my_scale%=num%
+my_scale%!4=num%
+my_scale%!8=VAL($FNiconstate(zoom%,1))
+my_scale%!12=VAL($FNiconstate(zoom%,1))
+
+ENDPROC
+
+DEF PROCden(inx%)
+den%=VAL($FNiconstate(zoom%,1))
+den%+=inx%
+IF den%>999 den%=999 ELSE IF den%<1 den%=1
+@%="F2.2"
+PROCseticonstate(zoom%,1,STR$(den%))
+@%="+F2.2"
+
+!my_scale%=VAL($FNiconstate(zoom%,0))
+my_scale%!4=VAL($FNiconstate(zoom%,0))
+my_scale%!8=den%
+my_scale%!12=den%
+
+ENDPROC
+
+DEF PROCsetscale
+!pl_scale%=!sp_scale%*!my_scale%
+pl_scale%!4=sp_scale%!4*my_scale%!4
+pl_scale%!8=sp_scale%!8*my_scale%!8
+pl_scale%!12=sp_scale%!12*my_scale%!12
+ENDPROC
+
+DEF PROCcreatesubmenu
+REM V.7
+@%="F2.2"
+PROCseticonstate(zoom%,0,STR$(num%))
+PROCseticonstate(zoom%,1,STR$(den%))
+PROCseticonstate(scale_win%,1,STR$(!my_scale%))
+per_scale%=!my_scale%
+@%="+F2.2"
+SYS"Wimp_CreateSubMenu",,rb%!20,rb%!24,rb%!28
+ENDPROC
+
+DEF PROCresizewindow
+PROCsetscale
+PROCget_spr_size
+PROCredraw(main%,TRUE)
+PROCopenw(main%)
+ENDPROC
+
+DEF PROCsave_title(job$,title$,chain$)
+file=OPENOUT("<AreaApp$Dir>.titledata")
+BPUT#file,job$
+BPUT#file,title$
+BPUT#file,chain$
+CLOSE#file
+SYS"OS_File",18,"<AreaApp$Dir>.titledata",&FFF
+ENDPROC
+
+DEF PROCload_title
+
+IF FNfound("titledata")=0 PROCreporterror(1,Tdat$,FALSE):ENDPROC
+
+file=OPENIN("<AreaApp$Dir>.titledata")
+job$="":title$="":chain$=""
+
+REPEAT
+chr=BGET#file
+IF chr<>&0A job$+=CHR$(chr)
+UNTIL chr=&0A
+
+REPEAT
+chr=BGET#file
+IF chr<>&0A title$+=CHR$(chr)
+UNTIL chr=&0A
+
+REPEAT
+chr=BGET#file
+IF chr<>&0A chain$+=CHR$(chr)
+UNTIL chr=&0A
+CLOSE#file
+
+PROCseticonstate(title%,1,job$)
+PROCseticonstate(title%,4,title$)
+PROCseticonstate(title%,5,chain$)
+ENDPROC
+
+DEF PROCstd_error
+REM ON ERROR SYS"PDriver_Reset":PROCreporterror(%11,REPORT$,TRUE)
+ON ERROR PROCreporterror(%11,REPORT$,TRUE)
+ENDPROC
+
+DEF PROCsave_types
+PROCget_basic_types
+file=OPENOUT("<AreaApp$Dir>.menudata")
+FOR chr=0 TO 4
+BPUT#file,cuttype$(chr)
+NEXT
+BPUT#file,M100$
+FOR chr=0 TO 4
+BPUT#file,filltype$(chr)
+NEXT
+BPUT#file,M101$
+CLOSE#file
+SYS"OS_File",18,"<AreaApp$Dir>.menudata",&FFF
+ENDPROC
+
+DEF PROCload_types
+
+IF FNfound("menudata")=0 PROCreporterror(1,Mdat$,FALSE):ENDPROC
+file=OPENIN("<AreaApp$Dir>.menudata")
+FOR cu=0 TO 5
+cu$=""
+REPEAT
+chr=BGET#file
+IF chr<>&0A cu$+=CHR$(chr)
+UNTIL chr=&0A
+cuttype$(cu)=cu$
+NEXT
+M100$=cuttype$(5)
+
+FOR cu=0 TO 5
+cu$=""
+REPEAT
+chr=BGET#file
+IF chr<>&0A cu$+=CHR$(chr)
+UNTIL chr=&0A
+filltype$(cu)=cu$
+NEXT
+M101$=filltype$(5)
+CLOSE#file
+ENDPROC
+
+DEF FNfound(to_find$)
+path$=""
+
+SYS"OS_ReadVarVal","AreaApp$Dir",var,4096,0 TO ,,bytes
+FOR chr=0 TO bytes-1
+path$+=CHR$(var?chr)
+NEXT
+path$+="."
+
+SYS"OS_File",13,to_find$,,,path$ TO found
+path$=""
+IF found>0 =TRUE
+=0
+
+DEF PROCpalette_changed
+
+!wo%=main%
+SYS"Wimp_GetWindowState",,wo%
+winminx=wo%!4
+winminy=wo%!8
+winmaxx=wo%!12
+winmaxy=wo%!16
+SYS"Wimp_ForceRedraw",-1,winminx,winminy,winmaxx,winmaxy
+
+ENDPROC
+
+DEF PROCintro_screen
+REM VDU7
+sp_size=50*1024
+sp=FNclaim_mod(sp_size)
+!sp=sp_size
+sp!4=0
+sp!8=16
+SYS&2E,9+256,sp
+spr$="daa_int_scr"
+
+
+SYS"OS_ReadModeVariable",-1,4 TO ,,xeig
+SYS"OS_ReadModeVariable",-1,5 TO ,,yeig
+IF xeig=1 AND yeig=1 intro_mode=20:intro_height=200 ELSE intro_mode=12:intro_height=100
+SYS&2E,15+256,sp,spr$,0,400,intro_height,intro_mode
+
+IF zise=0 THEN
+   SYS &2E,256+62,sp,spr$ TO ,,,zise
+   DIM sarea zise
+   ENDIF
+
+!sarea=0
+pal_bpp%=4
+SYS&2E,60+256,sp,spr$,sarea TO r0,r1,r2,r3
+f_err%=FALSE
+
+PROCfont_paint("Trinity.Medium",50*16,50*16,"D.A.A.",220,260)
+PROCfont_paint("Trinity.Medium",30*16,30*16,"Digital Area Analysis",75,160)
+PROCfont_paint("Trinity.Medium",15*16,15*16,"© Wardlaw Surveys 1992 - 1998",156,80)
+REM T$="no_grey% is "+STR$(no_grey%)
+REM PROCfont_paint("Trinity.Medium",15*16,15*16,T$,160,40)
+
+SYS &2E,r0,r1,r2,r3
+PROCget_spr_size
+sprite_loaded=TRUE:intro=TRUE
+PROCcreate_palette(FALSE)
+PROCread_palette
+ENDPROC
+
+DEF FNfont_error(eb%)
+IF eb%>=&200 AND eb%<=&27F =TRUE
+=FALSE
+
+DEF PROCfont_paint(font$,x_size,y_size,text$,x_pos,y_pos)
+SYS"XFont_FindFont",,font$,x_size,y_size,0,0 TO fh
+SYS"XFont_SetFontColours",fh,0,1,14
+SYS"XFont_SetFont",fh
+SYS"XFont_Paint",,text$,%1000010000,x_pos,y_pos
+SYS"XFont_LoseFont",fh
+ENDPROC
+
+DEF PROCpseudo_click(ps_win%,ps_icn%,bit)
+!sb=ps_win%
+sb!4=ps_icn%
+sb!8=bit<<21
+sb!12=1<<21
+SYS"Wimp_SetIconState",,sb
+
+ENDPROC
+
+DEF PROCwin_enter
+
+
+CASE !rb% OF
+     WHEN main% :
+          REM V.4:P.TAB(0,0);picking:V.5
+          IF picking=TRUE THEN
+             PROCx_hairs("ptr_pick",2,0,14)
+             ELSE
+             PROCx_hairs("ptr_cross",2,7,7)
+             ENDIF
+          MOUSE ON 2
+          REM picking=NOT picking
+          ENDCASE
+
+ENDPROC
+
+DEF PROCwin_leave
+CASE !rb% OF
+     WHEN main% : PROCx_hairs("ptr_default",1,0,0)
+          ENDCASE
+MOUSE ON 1
+ENDPROC
+
+DEF PROCx_hairs(p_spr$,p_no,x_at,y_at)
+
+SYS"Wimp_ReadPixTrans",&100,1,p_spr$,,,,p_scl%,p_trans%
+SYS"Wimp_SpriteOp",36,,p_spr$,p_no,x_at,y_at,p_scl%,0
+ENDPROC
+
+DEF PROCmodechanged
+SYS"Wimp_GetPointerInfo",,pb
+IF pb!12=main% PROCx_hairs("ptr_cross",2,7,7)
+ENDPROC
+
+DEF PROChelp
+help$=FNhelp_text(q%!32,q%!36)
+!q%=(LEN(help$)+25)ANDNOT3
+q%!12=q%!8
+q%!16=&503
+$(q%+20)=help$
+
+SYS"Wimp_SendMessage",17,q%,q%!4
+ENDPROC
+
+DEF FNhelp_text(hw%,hi%)
+text$=""
+
+CASE hw% OF
+     WHEN -2 : text$=icon$
+     WHEN main%
+          CASE hi% OF
+               WHEN -1 : text$=main$
+               ENDCASE
+     WHEN tools%
+          CASE hi% OF
+               WHEN 0  : text$=titl$
+               WHEN 1  : text$=calb$
+               WHEN 2  : text$=cuti$
+               WHEN 3  : text$=fill$
+               WHEN 4  : text$=calc$
+               WHEN 5  : text$=tprn$
+               WHEN 6  : text$=dsci$
+               WHEN 7  : text$=magi$
+               REM added 15.10.97
+               WHEN 8  : text$=pick$
+               WHEN 9  : text$=lnco$
+               ENDCASE
+     WHEN zoom%
+          text$=magn$
+
+     WHEN total%
+          CASE hi% OF
+               WHEN 6  : text$=prin$
+               WHEN 7,8: text$=down$
+               ENDCASE
+     WHEN title%
+          CASE hi% OF
+               WHEN 8  : text$=ok01$
+               ENDCASE
+     WHEN area%
+          CASE hi% OF
+               WHEN 3  : text$=ok02$
+               ENDCASE
+
+     WHEN save_image%
+          CASE hi% OF
+               WHEN 0 : text$=sav0$
+               WHEN 1 : text$=sav1$
+               WHEN 2 : text$=sav2$
+               ENDCASE
+
+     WHEN save_data%
+          CASE hi% OF
+               WHEN 0 : text$=dat0$
+               WHEN 1 : text$=dat1$
+               WHEN 2 : text$=dat2$
+               WHEN 4 : text$=dat4$
+               ENDCASE
+     WHEN info% : text$=Hinf$
+
+     WHEN opt%
+          CASE hi% OF
+               WHEN 2     : text$=Hop2$
+               WHEN 4     : text$=Hop4$
+               WHEN 5     : text$=Hop5$
+               WHEN 6     : text$=Hop6$
+               WHEN 7     : text$=Hop7$
+               WHEN 8     : text$=Hop8$
+               WHEN 11    : text$=Hop11$
+               WHEN 12    : text$=Hop12$
+               WHEN 13    : text$=Hop13$
+               WHEN 14    : text$=Hop14$
+               WHEN 18    : text$=Hop18$   :REM 15.10.97
+               ENDCASE
+     WHEN scale_win%
+          CASE hi% OF
+               WHEN 1     : text$=Hscl1$
+               WHEN 2     : text$=Hscl2$
+               WHEN 3     : text$=Hscl3$
+               WHEN 5     : text$=Hscl5$
+               WHEN 6     : text$=Hscl6$
+               WHEN 7     : text$=Hscl7$
+               WHEN 8     : text$=Hscl8$
+               WHEN 9     : text$=Hscl9$
+               WHEN 10    : text$=Hscl10$
+               ENDCASE
+
+
+OTHERWISE
+
+      SYS"Wimp_GetMenuState",1,ms%,hw%,hi%
+      SYS"Wimp_DecodeMenu",,lastmenu%,ms%,ans
+
+           CASE $ans OF
+                WHEN M000$ : text$=H000$
+                WHEN M001$ : text$=H001$
+                WHEN M002$ : text$=H002$
+                WHEN M100$ : text$=H100$
+                WHEN M101$ : text$=H101$
+                WHEN M102$ : text$=H102$
+                WHEN M103$ : text$=H103$
+                WHEN M104$ : text$=H104$
+                WHEN M105$ : text$=H105$
+                WHEN M106$ : text$=H106$
+                REM added 15.10.97
+                WHEN M107$ : text$=H107$
+                WHEN M108$ : text$=H108$
+                WHEN M109$ : text$=H109$
+                WHEN M1010$ : text$=H1010$
+
+                WHEN M103$+"."+M400$ : text$=H400$
+                OTHERWISE
+                menu_split=INSTR($ans,".")
+                menu_left$=LEFT$($ans,menu_split-1)
+                menu_right$=RIGHT$($ans,LEN($ans)-menu_split)
+REM                 text$=menu_left$+"|m"+menu_right$
+                IF menu_left$=M100$ text$=H200$ ELSE IF menu_left$=M101$ text$=H300$
+           ENDCASE
+ENDCASE
+=text$
+
+DEF PROCmessages
+SYS"OS_Module",6,,,16 TO ,,mh%
+SYS"MessageTrans_OpenFile",mh%,"<AreaApp$Dir>.Messages",0
+sern$=FNlookup("sern")
+vers$=FNlookup("vers"):PROCseticonstate(info%,4,vers$)
+sern$=FNlookup("sern")
+sern=VAL(sern$)
+sern=((sern EOR 831214) EOR 311073) EOR 29649
+
+at%=@%
+@%=2314
+sern$=STR$(sern)
+PROCseticonstate(info%,11,sern$)
+@%=at%
+icon$=FNlookup("icon")
+main$=FNlookup("main")
+titl$=FNlookup("titl")
+calb$=FNlookup("calb")
+cuti$=FNlookup("cuti")
+fill$=FNlookup("fill")
+calc$=FNlookup("calc")
+magn$=FNlookup("magn")
+magi$=FNlookup("magi")
+dsci$=FNlookup("dsci")
+REM added 15.10.97
+pick$=FNlookup("pick")
+lnco$=FNlookup("lnco")
+REM added 27.10.97
+no_grey$=FNlookup("no_grey")
+dat0$=FNlookup("dat0")
+dat1$=FNlookup("dat1")
+dat2$=FNlookup("dat2")
+dat4$=FNlookup("dat4")
+prin$=FNlookup("prin")
+tprn$=FNlookup("tprn")
+ok01$=FNlookup("OK01")
+ok02$=FNlookup("OK02")
+down$=FNlookup("down")
+M000$=FNlookup("M000")
+M001$=FNlookup("M001")
+M002$=FNlookup("M002")
+M100$=FNlookup("M100"):REM M100$=area1_type$
+M101$=FNlookup("M101"):REM M101$=area2_type$
+M102$=FNlookup("M102")
+M103$=FNlookup("M103")
+M104$=FNlookup("M104")
+M105$=FNlookup("M105")
+M106$=FNlookup("M106")
+M107$=FNlookup("M107")
+M108$=FNlookup("M108")
+M109$=FNlookup("M109")
+M1010$=FNlookup("M1010")
+M400$=FNlookup("M400")
+T000$=FNlookup("T000")
+T200$=FNlookup("T200")
+T300$=FNlookup("T300")
+T400$=FNlookup("T400")
+maxi$=FNlookup("maxi")
+SOPT$=FNlookup("SOPT")
+H100$=FNlookup("H100")
+H101$=FNlookup("H101")
+H102$=FNlookup("H102")
+H103$=FNlookup("H103")
+H104$=FNlookup("H104")
+H105$=FNlookup("H105")
+H106$=FNlookup("H106")
+
+REM next 4 added 15.10.97
+H107$=FNlookup("H107")
+H108$=FNlookup("H108")
+H109$=FNlookup("H109")
+H1010$=FNlookup("H1010")
+
+H200$=FNlookup("H200")
+H300$=FNlookup("H300")
+H400$=FNlookup("H400")
+H000$=FNlookup("H000")
+H001$=FNlookup("H001")
+H002$=FNlookup("H002")
+Hinf$=FNlookup("Hinf")
+REM Hop1$=FNlookup("Hop1")
+Hop2$=FNlookup("Hop2")
+REM Hop3$=FNlookup("Hop3")
+Hop4$=FNlookup("Hop4")
+Hop5$=FNlookup("Hop5")
+Hop6$=FNlookup("Hop6")
+Hop7$=FNlookup("Hop7")
+Hop8$=FNlookup("Hop8")
+Hop11$=FNlookup("Hop11")
+Hop12$=FNlookup("Hop12")
+Hop13$=FNlookup("Hop13")
+Hop14$=FNlookup("Hop14")
+
+Hop18$=FNlookup("Hop18")  :REM added 15.10.97
+REM Hop16$=FNlookup("Hop16")
+
+mode$=FNlookup("mode")
+pcol$=FNlookup("pcol")
+drag$=FNlookup("drag")
+derr$=FNlookup("derr")
+bads$=FNlookup("bads")
+room$=FNlookup("room")
+cal0$=FNlookup("cal0")
+nopr$=FNlookup("nopr")
+sav0$=FNlookup("sav0")
+sav1$=FNlookup("sav1")
+sav2$=FNlookup("sav2")
+Hscl1$=FNlookup("Hscl1")
+Hscl2$=FNlookup("Hscl2")
+Hscl3$=FNlookup("Hscl3")
+Hscl5$=FNlookup("Hscl5")
+Hscl6$=FNlookup("Hscl6")
+Hscl7$=FNlookup("Hscl7")
+Hscl8$=FNlookup("Hscl8")
+Hscl9$=FNlookup("Hscl9")
+Hscl10$=FNlookup("Hscl10")
+Tdat$=FNlookup("Tdat")
+Mdat$=FNlookup("Mdat")
+cal1$=FNlookup("cal1")
+cal2$=FNlookup("cal2")
+cal3$=FNlookup("cal3")
+line$=FNlookup("line")
+int$=FNlookup("int")
+cont$=FNlookup("cont")
+areac$=FNlookup("areac")
+areaf$=FNlookup("areaf")
+tcut1$=FNlookup("tcut1")
+tfill1$=FNlookup("tfill1")
+tcut2$=FNlookup("tcut2")
+tfill2$=FNlookup("tfill2")
+notfound$=FNlookup("notfound")
+Mpal$=FNlookup("Mpal")
+Tinfo$(0)=""
+Tinfo$(1)=" "+FNlookup("Tinfo1")
+Tinfo$(2)=" "+FNlookup("Tinfo2")
+Tinfo$(3)=" "+FNlookup("Tinfo3")
+
+SYS "MessageTrans_CloseFile", mh%
+SYS "OS_Module", 7,,mh%
+ENDPROC
+
+DEF FNlookup(look$)
+SYS "MessageTrans_Lookup", mh%, look$, 0, 0, 0, 0, 0, 0 TO ,,s$
+=s$
+=0
+
+DEF PROCm_list
+DIM list% 256
+!list%=3
+list%!4=9
+list%!8=&502
+list%!12=&400C0
+list%!16=&400C1
+list%!20=2
+list%!24=&80142 : REM PrintSave
+list%!28=&80143 : REM PrintInit
+list%!32=&80147 : REM SetPrinter
+list%!36=4
+list%!40=2
+list%!44=&80140
+list%!48=&80141
+list%!52=&80145
+list%!56=&400CA
+list%!60=&400CB
+list%!64=&400CC
+list%!68=0
+ENDPROC
+
+DEF PROCdrag
+drag_task=1
+!wo%=main%
+SYS"Wimp_GetWindowState",,wo%
+winminx=wo%!4
+winminy=wo%!8
+winmaxx=wo%!12
+winmaxy=wo%!16
+
+!drag=main%
+drag!4=7
+drag!8=dminx:REM !rb%
+drag!12=dminy:REM rb%!4
+drag!16=!rb%
+drag!20=rb%!4
+drag!24=winminx
+drag!28=winminy
+drag!32=winmaxx
+drag!36=winmaxy
+SYS"Wimp_DragBox",,drag
+dragging=TRUE
+
+ENDPROC
+
+DEF PROCdraw_line
+
+SYS"Wimp_DragBox",,-1
+
+dragging=FALSE
+REM linex0=!rb%
+REM liney0=rb%!12
+linex0=doldx
+liney0=doldy
+linex1=rb%!8
+liney1=rb%!4
+
+PROCreadpixtrans
+cx=!pb
+cy=pb!4
+!gws%=main%
+SYS"Wimp_GetWindowInfo",,gws%
+ox=gws%!4-gws%!20
+oy=gws%!8-(1024+gws%!24)+(gws%!16-gws%!8)
+
+flood_x=(cx-ox)
+flood_y=(cy-oy)
+
+SYS&2E,60+256,sp,spr$,sarea TO r0,r1,r2,r3
+
+IF INKEY(-1) GCOL0,0 ELSE GCOL0,l_col%
+
+LINE (linex0-ox)*(my_scale%!8/!my_scale%),(liney0-oy)*(my_scale%!12/my_scale%!4),(linex1-ox)*(my_scale%!8/!my_scale%),(liney1-oy)*(my_scale%!12/my_scale%!4)
+SYS &2E,r0,r1,r2,r3
+
+PROCredraw(main%,TRUE)
+
+ENDPROC
+
+DEF PROCdragging
+REM MOUSE ON 2
+SYS"Wimp_GetWindowInfo",,wo%
+!ud%=main%
+ud%!4=wo%!44
+ud%!8=wo%!48
+ud%!12=wo%!52
+ud%!16=wo%!56
+
+SYS"Wimp_UpdateWindow",,ud% TO more
+WHILE more
+
+    SYS"Wimp_GetPointerInfo",,pb
+    IF pb!12<>main% ENDPROC
+    IF !pb<>loldx OR pb!4<>loldy THEN
+        GCOL4,15
+        LINE dminx,dminy,!pb,pb!4
+        LINE loldx,loldy,dminx,dminy
+        ENDIF
+    SYS"Wimp_GetRectangle",,ud% TO more
+    ENDWHILE
+
+loldx=!pb:loldy=pb!4
+
+REM !wo%=main%
+REM SYS"Wimp_GetWindowState",,wo%
+REM IF !pb<(wo%!4+10)   PROCchwindow(-16,0)
+REM IF !pb>(wo%!12-10)  PROCchwindow(16,0)
+REM IF pb!4<(wo%!8+10)  PROCchwindow(0,-16)
+REM IF pb!4>(wo%!16-10) PROCchwindow(0,16)
+
+ENDPROC
+
+DEF PROCchwindow(dx,dy)
+!wo%=main%
+SYS"Wimp_GetWindowState",,wo%
+x_off=wo%!20
+y_off=wo%!24
+wo%!20+=dx
+wo%!24+=dy
+SYS"Wimp_OpenWindow",,wo%
+SYS"Wimp_GetPointerInfo",,pb
+
+SYS"Wimp_DragBox",,q%
+ENDPROC
+
+DEF PROCopt_open
+@%="F2.2"
+PROCseticonstate(opt%,4,STR$(l_col%))
+PROCseticonstate(opt%,2,STR$(error_correct%))
+PROCpseudo_click(opt%,8,anti)
+PROCpseudo_click(opt%,17,toolbox%)
+PROCopenw(opt%)
+@%="+F2.2"
+ENDPROC
+
+DEF PROCgrey(win%,icn%)
+
+!sb=win%
+sb!4=icn%
+sb!8=1<<22
+sb!12=1<<22
+SYS"Wimp_SetIconState",,sb
+
+ENDPROC
+
+DEF PROCgeticoncoords(win_gt%,icon_gt%)
+
+!wo%=win_gt%
+SYS"Wimp_GetWindowState",,wo%
+winminx=wo%!4
+winminy=wo%!8
+winmaxx=wo%!12:REM -winminx
+winmaxy=wo%!16:REM -winminy
+winxoff=wo%!20
+winyoff=wo%!24
+
+!icon_state%=win_gt%
+icon_state%!4=icon_gt%
+SYS"Wimp_GetIconState",,icon_state%
+
+icminx=winminx+icon_state%!8
+icmaxx=winminx+icon_state%!16
+icminy=winmaxy+icon_state%!12
+icmaxy=winmaxy+icon_state%!20
+
+ENDPROC
+
+
+DEF PROCdrag_icon(windy%,sprite$)
+drag_task=windy%
+PROCgeticoncoords(windy%,2)
+!drag=windy%
+drag!4=5
+drag!8=icminx
+drag!12=icminy
+drag!16=icmaxx
+drag!20=icmaxy
+drag!24=icminx-!pb
+drag!28=icminy-pb!4
+drag!32=FNscreen_x+(icmaxx-!pb)
+drag!36=FNscreen_y+(icmaxy-pb!4)
+
+SYS"OS_Byte",161,28 TO ,,ic_flags%
+IF ic_flags% AND 2 THEN
+   SYS"DragASprite_Start",197,1,sprite$,drag+8
+ELSE
+   SYS"Wimp_DragBox",,drag
+ENDIF
+ENDPROC
+
+DEF PROCdrag_end
+
+CASE drag_task OF
+     WHEN 1 : PROCdraw_line
+     WHEN save_image%,save_data% : oldpath$=path$:PROCfiler
+     ENDCASE
+
+SYS"Wimp_DragBox",,-1
+SYS"XDragASprite_Stop"
+ENDPROC
+
+DEF FNscreen_x
+SYS"OS_ReadModeVariable",-1,4 TO ,,lg2%
+SYS"OS_ReadModeVariable",-1,11 TO ,,var%
+=var%*2^lg2%
+
+DEF FNscreen_y
+SYS"OS_ReadModeVariable",-1,5 TO ,,lg2%
+SYS"OS_ReadModeVariable",-1,12 TO ,,var%
+=var%*2^lg2%
+
+DEF PROCfiler
+print%=FALSE
+
+SYS"Wimp_GetPointerInfo",,pfb
+!msg%=128
+msg%!4=0 : REM not used on entry
+msg%!8=0 : REM not used on entry
+msg%!12=0 : REM original message
+msg%!16=1 : REM data_save
+msg%!20=pfb!12 : REM dest win handle
+msg%!24=pfb!16 : REM dest icn handle
+msg%!28=!pfb : REM x
+msg%!32=pfb!4 : REM y
+
+CASE drag_task OF
+     WHEN save_image%
+          msg%!36=!sp : REM est size
+          msg%!40=&FF9 : REM sprite
+     WHEN save_data%
+          msg%!36=255 : REM est. size
+          msg%!40=&DFE : REM CSV
+          ENDCASE
+
+split$=FNextract(FNiconstate(drag_task,1))
+REM PROCsplit(FNextract($FNiconstate(drag_task,1)))
+PROCsplit(split$)
+$(msg%+44)=name$+CHR$(0) : REM proposed leafname
+REM VDU4:PRINTTAB(0,2);name$
+REM IFGET
+SYS"Wimp_SendMessage",17,msg%,pfb!12,pfb!16 TO ,,th%
+REM my_ref=msg%!8
+ENDCASE
+
+
+ENDPROC
+
+DEF PROCsave_image
+save_addr%=rb%+44
+save_file$=FNextract(save_addr%)
+my_ref=rb%!8
+thing%=rb%!36
+res%=FALSE
+REM asdq=OPENOUT("RAM:$.asdq")
+REM BPUT#asdq,save_file$
+REM BPUT#asdq,STR$(rb%!36)
+REM CLOSE#asdq
+IF (current_cut>1 OR current_fill>1 OR current_calib>1) AND save_file$<>"<Wimp$Scrap>" AND thing%<>-1 THEN
+   SYS"Wimp_CreateMenu",,-1
+   PROCopen_w_c(close%)
+   SYS"Wimp_SetCaretPosition",close%,-1,0,0,%0010000000000000000000011000,0
+   came_from=0
+   ELSE
+   PROCsave_image1
+   ENDIF
+ENDPROC
+
+DEF PROCsave_image1
+save_file$=FNextract(save_addr%):REM (rb%+44)
+REM VDU4:PRINTTAB(0,0);save_file$
+REM my_ref=rb%!8
+LOCAL ERROR
+ON ERROR LOCAL:RESTORE ERROR:PROCtell(derr$+" "+REPORT$+"."):ENDPROC
+SYS&2E,12+256,sp,save_file$
+
+PROCdata_load(&FF9,save_file$,!sp,my_ref)
+
+REM IF rb%!36<>-1 THEN
+IF thing%<>-1 THEN
+   PROCseticonstate(save_image%,1,save_file$)
+   PROCsplit(save_file$)
+   filename$=save_file$
+   PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+   dir$=save_file$
+   ENDIF
+IF thing%=-1 path$=""
+SYS"Wimp_CreateMenu",,-1
+ENDPROC
+
+DEF PROCsave_image2(flag)
+res%=FALSE
+save_file$=FNextract(FNiconstate(save_image%,1))
+IF (current_cut>1 OR current_fill>1 OR current_calib>1) AND INSTR(save_file$,".")<>0 THEN
+   SYS"Wimp_CreateMenu",,-1
+   PROCopen_w_c(close%)
+   SYS"Wimp_SetCaretPosition",close%,-1,0,0,%0010000000000000000000011000,0
+   came_from=2
+   ELSE
+   PROCsave_image3(flag)
+   ENDIF
+ENDPROC
+
+DEF PROCsave_image3(flag)
+
+save_file$=FNextract(FNiconstate(save_image%,1))
+CASE INSTR(save_file$,".") OF
+     WHEN 0 : PROCtell(drag$)
+
+OTHERWISE
+     LOCAL ERROR
+     ON ERROR LOCAL:RESTORE ERROR:PROCtell(derr$+" "+REPORT$+"."):ENDPROC
+     SYS&2E,12+256,sp,save_file$
+     filename$=save_file$
+     PROCset_title(main%,filename$+Tinfo$(tinfo)+FNstar)
+     IF flag SYS"Wimp_CreateMenu",,-1
+
+ENDCASE
+ENDPROC
+
+DEF PROCset_title(!wintitle%,new_title$)
+SYS"Wimp_GetWindowInfo",,wintitle%
+$(wintitle%!76)=new_title$
+REM PROCredraw(FALSE)
+!set=main%
+SYS"Wimp_GetWindowOutline",,set
+REM GC.0,15
+REM REC.FILL set!4,set!16-38,set!12-set!4,38
+SYS"Wimp_ForceRedraw",-1,set!4,set!16-38,set!12,set!16
+ENDPROC
+
+DEF FNget_title(!wintitle%)
+SYS"Wimp_GetWindowInfo",,wintitle%
+=$(wintitle%!76)
+
+DEF PROCdata_load(dl_type%,dl_file$,dl_est,your_ref)
+!msg%=128
+msg%!12=your_ref:REM rb%!8
+msg%!16=3
+msg%!20=pfb!12
+msg%!24=pfb!16
+msg%!28=!pfb
+msg%!32=pfb!4
+msg%!36=dl_est:REM !sp
+msg%!40=dl_type%:REM &FF9
+REM VDU4:PRINTTAB(0,1);dl_file$:VDU5:IFGET
+REM IF unsafe=TRUE msg%!36=-1
+$(msg%+44)=dl_file$+CHR$(0):REM save_file$
+REM IF filer=-1 $(msg%+44)="<Wimp$Scrap>"+CHR$(0)
+SYS"Wimp_SendMessage",17,msg%,pfb!12,pfb!16 TO ,,th%
+ENDPROC
+
+DEF FNextract(ext_addr%)
+extract$="":offset=0
+
+REPEAT
+ext_chr=ext_addr%?offset
+IF ext_chr<>0 AND ext_chr<>13 extract$+=CHR$(ext_chr):offset+=1
+UNTIL ext_chr=0 OR ext_chr=13
+=extract$
+
+DEF PROCprint
+print%=TRUE
+!msg%=256
+msg%!12=0
+msg%!16=&80142
+msg%!20=0
+msg%!24=0
+msg%!28=0
+msg%!32=0
+msg%!36=300
+msg%!40=&FFF
+SYS"Wimp_SendMessage",18,msg%,0
+my_ref=msg%!8
+ENDPROC
+
+DEF PROCprint__data
+save_file$=FNextract(rb%+44)
+my_ref=rb%!8
+PROCprintfr
+PROCdata__load
+ENDPROC
+
+DEF PROCdata__load
+!msg%=128
+msg%!12=my_ref
+msg%!16=3
+msg%!20=rb%!20
+msg%!24=rb%!24
+msg%!28=rb%!28
+msg%!32=rb%!32
+msg%!36=rb%!36
+msg%!40=&FFF
+
+$(msg%+44)=save_file$
+SYS"Wimp_SendMessage",17,msg%,rb%!4 TO ,,th%
+ENDPROC
+
+DEF PROCuser_mess_ack
+CASE rb%!16 OF
+     WHEN &80142 : PROCtell(nopr$)
+     ENDCASE
+ENDPROC
+
+DEF PROCcheck_for_printer
+LOCAL ERROR
+ON ERROR LOCAL:RESTORE ERROR:printer_selected=FALSE:ENDPROC
+SYS"PDriver_Info"
+printer_selected=TRUE
+ENDPROC
+
+DEF PROCopen_data_win
+
+PROCopenw_as_menu(save_data%,!rb%,rb%!4)
+REM SYS"Wimp_CreateMenu",,save_data%,!rb%,rb%!4
+ENDPROC
+
+DEF PROCopen_mag_win
+at%=@%
+@%="g10.9"
+per_scale%=!my_scale%
+$FNiconstate(scale_win%,1)=STR$(!my_scale%)
+@%=at%
+PROCopenw_as_menu(scale_win%,!rb%,rb%!4)
+REM SYS"Wimp_CreateMenu",,save_data%,!rb%,rb%!4
+ENDPROC
+
+DEF PROCopenw_as_menu(windy%,watx%,waty%)
+REM opens a window as a menu, centering it around the pointer
+!ow%=windy%
+SYS"Wimp_GetWindowInfo",,ow%
+IF windy%<>main% ow%!28=-1
+wwidth%=ow%!12-ow%!4
+wheight%=ow%!16-ow%!8
+
+watx%=watx%-wwidth%/2
+IF watx%<0 watx%=0
+waty%=waty%+wheight%/2
+IF waty%<0 waty%=0
+
+SYS"Wimp_CreateMenu",,windy%,watx%,waty%
+lastmenu%=windy%
+ENDPROC
+
+DEF PROCsave_results
+save_file$=FNextract(rb%+44)
+REM VDU4:PRINTTAB(0,0);save_file$:IFGET
+my_ref=rb%!12
+LOCAL ERROR
+ON ERROR LOCAL:RESTORE ERROR:PROCtell(derr$+" "+REPORT$+"."):ENDPROC
+
+CASE append OF
+     WHEN TRUE
+          REM IF DOESN'T EXIST - CREATE
+          SYS"OS_File",5,save_file$ TO obj_found
+          IF obj_found THEN
+                           save_file%=OPENUP(save_file$)
+                       ELSE
+                           save_file%=OPENOUT(save_file$)
+                           ENDIF
+          PTR#save_file%=EXT#save_file%
+     WHEN FALSE
+          save_file%=OPENOUT(save_file$)
+     ENDCASE
+
+
+out$=q$+job$+q$+","+q$+title$+q$+","+q$+chain$+q$+","+q$+tcut2$+"  : "+cut_type$+q$+","
+REM out$=out$+","
+REM V.4:P.TAB(0,0);cut_sel
+IF cut_sel<>0 THEN
+   FOR comma=1 TO cut_sel
+       out$+=","
+       NEXT
+   ENDIF
+
+out$+=STR$(total_cut*(1+(error_correct%/100))):REM +","
+
+
+FOR comma=1 TO 6-cut_sel
+    out$+=","
+    NEXT
+
+out$+=q$+tfill2$+" : "+fill_type$+q$+","
+IF fill_sel<>0 THEN
+   FOR comma=1 TO fill_sel
+       out$+=","
+       NEXT
+   ENDIF
+
+out$+=STR$(total_fill*(1+(error_correct%/100)))
+
+REM MO.0:P.out$:IFGET:END
+BPUT#save_file%,out$
+REM IF current_cut
+REM BPUT#save_file%
+CLOSE#save_file%
+SYS"OS_File",18,save_file$,&DFE
+PROCdata_load(&DFE,save_file$,255,rb%!8)
+
+IF rb%!36<>-1 THEN
+   PROCseticonstate(save_data%,1,save_file$)
+   PROCsplit(save_file$)
+   REM PROCset_title(main%,save_file$)
+   ENDIF
+
+SYS"Wimp_CreateMenu",,-1
+ENDPROC
+
+DEF PROCsave_results2
+save_file$=FNextract(FNiconstate(save_data%,1))
+CASE INSTR(save_file$,".") OF
+     WHEN 0 : PROCtell(drag$)
+OTHERWISE
+     LOCAL ERROR
+     ON ERROR LOCAL:RESTORE ERROR:PROCtell(derr$+" "+REPORT$+"."):ENDPROC
+
+CASE append OF
+     WHEN TRUE
+          REM IF DOESN'T EXIST - CREATE
+          SYS"OS_File",5,save_file$ TO obj_found
+          IF obj_found THEN
+                           save_file%=OPENUP(save_file$)
+                       ELSE
+                           save_file%=OPENOUT(save_file$)
+                           ENDIF
+          PTR#save_file%=EXT#save_file%
+     WHEN FALSE
+          save_file%=OPENOUT(save_file$)
+     ENDCASE
+
+
+out$=q$+job$+q$+","+q$+title$+q$+","+q$+chain$+q$+","+q$+tcut2$+"  : "+cut_type$+q$+","
+IF cut_sel<>0 THEN
+   FOR comma=1 TO cut_sel
+       out$+=","
+       NEXT
+   ENDIF
+
+out$+=STR$(total_cut*(1+(error_correct%/100)))
+
+FOR comma=1 TO 6-cut_sel
+    out$+=","
+    NEXT
+
+out$+=q$+tfill2$+" : "+fill_type$+q$+","
+IF fill_sel<>0 THEN
+   FOR comma=1 TO fill_sel
+       out$+=","
+       NEXT
+   ENDIF
+
+out$+=STR$(total_fill*(1+(error_correct%/100)))
+
+REM MO.0:P.out$:IFGET:END
+BPUT#save_file%,out$
+REM IF current_cut
+REM BPUT#save_file%
+CLOSE#save_file%
+SYS"OS_File",18,save_file$,&DFE
+
+
+ENDCASE
+ENDPROC
+
+DEF PROCcreate_palette(set_daa_cols%)
+SYS&2E,37+256,sp,spr$,16 TO ,,,pal_size%,pal_ptr%
+
+SYS&2E,8+256,sp TO ,,,,first_spr%
+
+FOR colr=0 TO 15
+col=15-colr
+?col_set=&00
+col_set?1=col*17
+col_set?2=col*17
+col_set?3=col*17
+!(sp+first_spr%+44+(8*colr))=!col_set
+NEXT
+
+
+REM IF set_daa_cols% PROCset_daa_cols
+ENDPROC
+
+DEF PROCset_daa_cols
+SYS&2E,37+256,sp,spr$,16 TO ,,,pal_size%,pal_ptr%
+SYS&2E,8+256,sp TO ,,,,first_spr%
+!(sp+first_spr%+44+(8*8))=&99440000
+!(sp+first_spr%+44+(8*10))=&00EE0000
+!(sp+first_spr%+44+(8*11))=&0000EE00
+!(sp+first_spr%+44+(8*14))=&00BBFF00
+ENDPROC
+
+DEF PROCinc_dec(inc_win%,inc_icn%,min%,max%,inc_button%,inc_dirn%)
+
+LOCAL value%
+value%=VAL($FNiconstate(inc_win%,inc_icn%))
+IF inc_button%=4 value%+=inc_dirn% ELSE IF inc_button%=1 value%-=inc_dirn%
+_update=TRUE
+IF value%<min% value%=min%:_update=FALSE
+IF value%>max% value%=max%:_update=FALSE
+
+at%=@%
+@%="g10.9"
+IF _update THEN
+   PROCseticonstate(inc_win%,inc_icn%,STR$(value%))
+
+   SYS"Wimp_SetCaretPosition",inc_win%,inc_icn%,,,-1,LEN(STR$(value%))
+   @%=at%
+   ENDIF
+ENDPROC
+
+DEF PROCopen_w_c(windy%)
+!gws%=windy%
+SYS"Wimp_GetWindowState",,gws%
+gws%!4=(FNscreen_x/2)-win_width%/2
+gws%!8=(FNscreen_y/2)-win_height%/2
+gws%!12=gws%!4+win_width%
+gws%!16=gws%!8+win_height%
+SYS"Wimp_OpenWindow",,gws%
+ENDPROC
+
+DEF PROCupdate_values
+FOR update_cut=1 TO current_cut-1
+   REM cut(update_cut)=cut(update_cut)*(1+(error_correct%/100))
+   PROCseticonstate(calc%,update_cut,STR$(cut(update_cut)*(1+(error_correct%/100))))
+   NEXT
+FOR update_fill=1 TO current_fill-1
+   REM cut(update_cut)=cut(update_cut)*(1+(error_correct%/100))
+   PROCseticonstate(calc%,update_fill+30,STR$(fill(update_fill)*(1+(error_correct%/100))))
+   NEXT
+PROCsum
+ENDPROC
+
+DEF FNstar
+IF current_calib>1 OR current_fill>1 OR current_cut>1 THEN =" *"
+=""
+
+DEF PROCselect_colour(c%)
+REM l_col%
+REM PROCborder_icon(colours%,l_col%,0)
+REM PROCborder_icon(colours%,c%,1)
+s_col%=c%
+at%=@%
+@%="+g10.2"
+PROCseticonstate(colours%,21,STR$(s_col%))
+@%=at%
+REM PROCgeticoncoords(colours%,20)
+
+REM SYS"Wimp_ForceRedraw",colours%,icminx,icminy,icmaxx,icmaxy
+PROCupdate(colours%,20)
+
+ENDPROC
+
+DEF PROCborder_icon(ps_win%,ps_icn%,bit)
+!sb=ps_win%
+sb!4=ps_icn%
+sb!8=bit<<2
+sb!12=1<<2
+SYS"Wimp_SetIconState",,sb
+ENDPROC
+
+DEF PROCpick_from_sprite
+picking=TRUE
+ENDPROC
+
+DEF PROCpick_colour
+PROCreadpixtrans
+
+IF mlog_col<>15 PROCtell(mode$):ENDPROC
+cx=!pb
+cy=pb!4
+!gws%=main%
+SYS"Wimp_GetWindowInfo",,gws%
+ox=gws%!4-gws%!20
+oy=gws%!8-(1024+gws%!24)+(gws%!16-gws%!8)
+
+pick_x=(cx-ox)
+pick_y=(cy-oy)
+
+SYS&2E,60+256,sp,spr$,sarea TO r0,r1,r2,r3
+old_l_col%=l_col%
+l_col%=POINT(pick_x*(my_scale%!8/!my_scale%),pick_y*(my_scale%!12/my_scale%!4))
+IF l_col%<0 l_col%=0 ELSE IF l_col%>15 l_col%=15
+REM CIRCLE pick_x*(my_scale%!8/!my_scale%),pick_y*(my_scale%!12/my_scale%!4),10
+SYS &2E,r0,r1,r2,r3
+
+picking=FALSE
+s_col%=l_col%
+SYS"Wimp_GetPointerInfo",,pb
+IF pb!12=main% THEN
+   PROCx_hairs("ptr_cross",2,7,7)
+   MOUSE ON 2
+   ENDIF
+PROCset_toolbox
+ENDPROC
+
+DEF PROCset_toolbox
+REM IF green > 50% black
+at%=@%
+@%="+G10.2"
+PROCseticonstate(tools%,9,STR$(l_col%))
+PROCseticonstate(opt%,4,STR$(l_col%))
+@%=at%
+ENDPROC
+
+DEF PROCcolour_icon(ps_win%,ps_icn%,fgbits,bgbits)
+!sb=ps_win%
+sb!4=ps_icn%
+sb!8=(fgbits<<24)+(bgbits<<28)
+sb!12=%11111111<<24
+SYS"Wimp_SetIconState",,sb
+ENDPROC
+
+DEF PROCclear_selection
+FOR c=0 TO 15
+PROCborder_icon(colours%,c,0)
+NEXT
+PROCborder_icon(colours%,l_col%,1)
+ENDPROC
+
+DEF FNchop(stbc$)
+i$="":i=1
+a$=MID$(stbc$,i,1)
+WHILE ASC(a$)>32
+   i$+=a$
+   i+=1
+   a$=MID$(stbc$,i,1)
+   ENDWHILE
+=i$
+
+DEF PROCget_basic_types
+REM VDU7
+!menusel=0:menusel!4=-1
+SYS"Wimp_DecodeMenu",,main,menusel,t_ans
+M100$=$t_ans
+!menusel=1:menusel!4=-1
+SYS"Wimp_DecodeMenu",,main,menusel,t_ans
+M101$=$t_ans
+ENDPROC
+
+DEF PROCread_palette
+IF sprite_loaded=FALSE OR pal_bpp%<>4 ENDPROC
+FOR p=0 TO 15
+   r2%=!(sp+first_spr%+44+(8*p))
+   sp_col(p)=r2%
+   NEXT
+ENDPROC
+
+DEF PROCdraw_colours
+FOR ic%=0 TO 15
+    PROCgeticoncoords(colours%,ic%)
+    PROCcgcol(0,sp_col(ic%) AND &FFFFFF00)
+    RECTANGLE FILL icminx+2,icminy+2,(icmaxx-icminx)-4,(icmaxy-icminy)-4
+    NEXT
+PROCgeticoncoords(colours%,20)
+PROCcgcol(0,sp_col(s_col%) AND &FFFFFF00)
+RECTANGLE FILL icminx+2,icminy+2,(icmaxx-icminx)-4,(icmaxy-icminy)-4
+ENDPROC
+
+DEF PROCcgcol(act,g_palette)
+SYS"ColourTrans_SetGCOL",g_palette,,,&100,0 TO r0%
+ENDPROC
+
+DEF PROCinfo(inf%)
+x0%=!inf%:y0%=inf%!4:x1%=inf%!8:y1%=inf%!12
+scx%=inf%!16:scy%=inf%!20:bhandle%=inf%!24:flags%=inf%!28
+bx%=x0%-scx%:by%=y1%-(1024+scy%) : REM all drawing should be relative to bx%,by%
+ENDPROC
+
+DEF PROCopen_colours
+IF pal_bpp%<>4 PROCtell(pcol$)
+PROCread_palette
+s_col%=l_col%
+at%=@%
+@%="+g10.2"
+PROCseticonstate(colours%,21,STR$(s_col%))
+@%=at%
+PROCopenw_as_menu(colours%,!rb%,rb%!4)
+ENDPROC
