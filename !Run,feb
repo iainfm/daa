@@ -1,0 +1,4 @@
+Set AreaApp$Dir <Obey$Dir>
+IconSprites <AreaApp$Dir>.Sprites
+WimpSlot -min 300K -max 300K
+Run <AreaApp$Dir>.!RunImage

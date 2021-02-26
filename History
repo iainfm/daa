@@ -1,0 +1,115 @@
+19/01/93 Recognises palette changes and acts accordingly
+30/01/93 Got slabbed OK icons to click when return pressed
+         Pointer changes to cross-hairs over main window
+31/01/93 Interactive help/messages added
+         All menu items loaded from messages
+01/02/93 Adjust now draws lines
+02/02/93 Reload brings main window to front
+ .
+ .       Tried to get proper pdriver support - unsuccessful for now.
+ .
+14/02/93 Line drawing changed to line from dashed box - using 2*EOR lines
+27/02/93 Adjust-Click over main close opens parent, closes main,
+         Shift-Adjust-Click opens parent, leaves main open.
+02/03/93 Writable icons change pointer to caret thingy, using P indirection.
+07/03/93 Designed some lo-res (mode 12) icons and increased height of
+         writable icons to avoid the caret being left behind in these modes.
+         Changed intro sprite to no palette so it's diplayed ok in 256 colour
+         modes.
+09/03/93 Added functionality to options window. 'Save' saves line colour
+         which is loaded back in when run. Greyed out ² option icon.
+         Altered some of the hi-res colour icons to make them more 'hi-ressy'
+         Cut/Fill items & submenu items select appropriate icon in toolbox.
+13/03/93 4am: Put line draw/undraw in updatewindow structure, but still not
+         working properly.
+15/03/93 Line draw working ok, but had to not change pointer during drag so
+         it doesn't 'escape'
+17/03/93 1am: Changed so sprite is loaded at himem, rather than in module 
+         space, like flex in C.
+         Minimised (nearly) the workspace for the windows.
+17/03/93 5pm: Removed most REM statements and unnecessary procedures.
+         Changed update icon to Wimp_SetIconState, from ForceRedraw.
+18/03/93 1am: Now checks if there's enough memory to load new image and
+         aborts if there's not.
+         Checks to see if the calibration area is non-zero to correct 
+         'Division by 0' error.
+25/03/93 Incorporated option for ² character for demo to HRC.
+         Put KAR valid strings in writable icons in options window.
+29/03/93 Interactive help for menus working.
+30/03/93 Interactive help for everything...so far. Intro screen adjusts for
+         current screen mode.
+         ColourTrans used so sprite can be displayed in 256 colour modes.
+         Warning added if sprite is not 4bpp.
+10/04/93 Started to put a save sprite option on. Got menu entry and drag to
+         work so far.
+11/04/93 Save routines working ok. Just need to check path is ok and put
+         filename in save box when a sprite is loaded.
+12/04/93 Finished save routines but need to add interactive help to save
+         window.
+15/04/93 Added 'anti-alias image' to options.
+28/04/93 Printer driver support added using messages. A bit messy but works
+         ok.(For now). Perhaps add a printer icon to tool box and work menu.
+29/04/93 Tested postscript output. Seems Ok. Put vers$ in printout & reduced
+         width of = and - lines to 76 so it's ok on PS printout.
+         Added printer icon to tool window, but not linked it to program.
+         Linked icon to print routine.
+         More messages added.
+01/05/93 Slightly changed the menu creation routine, so it can be crunched,
+         and probably compiled/squashed.
+25/05/93 RO3 PRMs arrived. Added kerning to start-up text
+04/06/93 Used ro3 funtion to read the sizes for the templates.
+         Made some templates with fonts for text
+         Made menus with fonts but can't get the title to font yet.
+05/01/94 Changed DEFFNget_file_length because of problems with >77 directory
+         entries in sparkfs.
+23/12/94 Added saving of results in CSV format and altered toolbox to 
+         include new save icon and to behave properly when attached to main
+         window.
+24/12/94 Ammended toolbox opening/moving. Sorted (maybe) messages out.
+26/12/94 Added magnifier icon to toolbox & help for save data & new toolbox
+         icons.
+29/12/94 Changed way that pixel trans table is created and if a 16 col. sprite
+         is loaded with no palette one is added and 'daa colours' are changed
+         in the sprite palette rather than in the pix trans table which didn't
+         work in 32K/16M col. modes.
+30/12/94 Changed zoom window to scale window.
+08/01/95 Added 5th type to cut/fill menus. Save Results now tabulates data
+         according to its position in the menu.
+14/01/95 Pinning the windows to the backdrop now works correctly.(rb%!28=-3
+         if the window is being iconised). Check this works ok on ROS3.1x
+         'OK' in the title window no longer closes the window.
+15/01/95 Re-wrote DEFPROCopen() and shortened considerably. Now no longer
+         requires rb%!28=-3 to pin correctly.
+16/01/95 Altered open() AGAIN because toolbox wasn't moving correctly when
+         toggle size was clicked. Botched it by doing the open bit twice.
+17/01/95 Re-organised preferences window. Wrote general proc for
+         incrementing/decrementing adjuster arrows and their icons in
+         dialogue boxes.
+20/01/95 Designed new icon for titles.
+21/01/95 Changed 400% to 300% in magnify window.
+22/01/95 Added warning window to inform about dangers of saving processed
+         images.
+13/02/95 Keys work in the save warning window (escape cancels etc)
+14/02/95 Area correction option works.
+17/02/95 All messages now come from messages file.(I think...)
+20/02/95 Cured a couple of bugs to do with reloading saved images & reopening
+         directories if saved to wimp$scrap
+05/07/95 Changed menu structure to all of the toolbox tools can be activated
+         using the main menu
+05/07/95 Added option to turn toolbox on and off
+12/10/95 Fixed 'do you want..' bug when saving altered picture to printer
+15/10/95 Changed redraw routine when title bar is changed
+16/10/95 Refined how the title changes & added '*' indicator to changed files
+04/03/96
+06/06/97 Correction factor was not reading on cut calculated areas,
+         correction factor in process(pixels%) amended by GFM
+11/09/97 Added serial no. to info template.
+         Added area types to options template.
+12/09/97 Pick colour from sprite/select from palette implemented
+14/09/97 Area types can now be changed via the (now) writable main menu items
+18/09/97 Re-wrote DEFPROCredraw
+23/09/97 Encryption/Decryption for serial number. Tidied up selection of
+         colours. Printing altered to include type of Area 1 and 2.
+27/10/97 Add OS version detection to disable Anti-alias image if necessary
+02/03/98 Changed assembler so lines don't get overwritten during flood
+         fill (v2.60)

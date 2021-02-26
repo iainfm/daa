@@ -1,0 +1,184 @@
+# Messages file for DAA
+# general
+
+sern:758183
+vers:v2.60b (2nd March 1998)
+icon:This is the DAA application.|MClick select or drag a sprite file to the icon to start.
+main:Double-click with select to select an area to calculate.|MDrag adjust to draw a line.|MDrag adjust with shift held down to remove a line.
+
+# Criteria for not using Plot Sprite Grey Scaled
+# Wimp version * 100
+
+no_grey:>=370
+
+# toolbox icons
+
+titl:Click this icon to input the title data.
+calb:Click here to select calibrate.|MThis must be done before area analysis can begin.
+cuti:Click here to select area set 1.
+fill:Click here to select area set 2.
+calc:Click here to reveal the area calculations.
+magn:Use the arrows to scale the view up and down, or type the values in.
+magi:Click here to show the 'magnifier' window.
+dsci:Click here to show the 'save results' window.
+pick:Click here to choose or amend the line colour for the image.
+lnco:This is the currently selected line colour for the image.
+
+# data save window
+
+dat0:Click 'OK' to save the file as the current filename (if valid).
+dat1:Type in the filename here and click 'OK', or drag the icon above to a directory display.
+dat2:Drag this icon to a directory display to save, or to a suitable application to edit.
+dat4:When selected the new data will be appended to the file, otherwise a new file will be created.
+
+# printer
+
+prin:Click the printer icon to print the data.|MUse adjust to close the calculation windows automatically.                  
+tprn:Click here to print the area totals and analysis.|MTo print the image, drag the icon in the 'Save Image' window to a printer driver.
+
+# OK's
+
+OK01:Click 'OK' to accept the data and save it.|MIt can be altered by clicking the 'title' icon again.
+OK02:Click 'OK' to accept this value.|MIt can be altered by clicking the 'calibration' icon again.
+
+# calc window
+
+down:These icons display the area types selected.|MThey can be changed by choosing the types in the area type submenus.
+
+# errors
+
+maxi:The maximum number of areas has been reached.
+notfound:not found.
+# menu items
+# icon menu
+
+M000:Info
+M001:Preferences...
+M002:Quit  
+
+# main menu
+
+M100:Cut
+M101:Fill
+M102:Calibrate...
+M103:Save types
+#    -------------
+M1010:Show headings...
+M104:Save results
+M105:Print results
+M106:Show results...
+#    -------------
+M107:Reload
+# M108:Calculate
+M108:Magnify
+M109:Save image
+
+M400:Keep results
+
+# menu titles
+
+T000:D.A.A.
+T200:Area Set 1
+T300:Area Set 2
+T400:Reload  
+
+# more errors/warnings
+
+SOPT:Couldn't save options.
+nfnd: not found.
+room:No room for image.
+cal0:WARNING: The calibration area is zero.
+cal1:There is no calibration area.
+cal2:The known area has not been entered.
+cal3:The known area is zero.
+line:Line colour must be between 0 and 15 inclusive.
+Tdat:Title data not found - entries will be blank.
+Mdat:Menu data not found - entries will be blank.
+Mpal:No sprite loaded yet. Please load one or enter the line colour yourself.
+
+# help for menu items
+
+H100:Area Set 1.|MChoose this item for a plain area and to select the first area tool from the toolbox.|mMove the pointer to the right to select or alter user area types.
+H101:Area Set 2|MChoose this item for a plain area and to select the second area tool from the toolbox.|mMove the pointer to the right to select or alter user area types.
+H102:Calibrate the image.|MChoose this to enter the calibration square area value.
+H103:Save the Set and Area types|MChoose this to save the user's area type preferences.
+#     -----------
+H1010:Show the current DAA headings|MChoose this item show the user's image headings.
+H104:Save results as a CSV filetype.|MClick select to save with the current filename. Move the pointer to the right to reveal the save window.                                    
+H105:Print results.|MEnsure that a printer driver is already loaded.
+H106:Show results of the analysis.|MThis item will show the calculated areas, displaying the results in two windows.|mThis can also be done using the calculator icon in the 'toolbox'.
+#     -----------
+H107:Reload the current image.|MChoose this item to reload this file.|mALL the calculations done on this file will be cleared.|mChoose the option in the sub-menu if you wish to keep them.
+H108:Magnify|MMove the pointer to the right to scale the view to the desired magnification.
+H109:Save image.
+
+H400:This item will reload this file, keeping the calculated results.
+H200:Choose an item to select the user's first area set/type or alter it by typing.
+H300:Choose an item to select the user's second area set/type or alter it by typing.
+H000:Move the pointer to the right to display information about this version of DAA.
+H001:Choose this entry to display, alter and save the user's preferences.
+H002:'Quit' will end your session with DAA.
+ 
+# help for the windows
+
+Hinf:This window displays information about DAA.
+
+#Hop1:Enter your printer's code for the 'squared' character in the box to the right.
+Hop2:Enter the correction factor here if the results are consistently different from known values.
+#Hop2:Click here to enter the code.|mThis must be in the range 0-255.|mConsult your printer manual for further details.
+
+#Hop3:Enter the colour of the lines your scanner produces in the box to the right.|mThis can be found using !Paint.|mThe anti-aliasing option improves the display of the image, particularly on lo-res monitors, but is slower.
+Hop4:Enter the line colour here.|mThis must be in the range 0-15 and can be found using !Paint or Pick-from-Sprite.
+Hop5:Click here to accept and save your preferences to file.
+Hop6:Click here to abandon any changes made.
+Hop7:Click here to accept the changes.
+Hop8:Click here to toggle the anti-aliasing option. NOTE: This option is not supported under Risc OS 3.7 and should be ignored.|mThe anti-aliasing option improves the display of the image, particularly on lo-res monitors, but is slower.
+Hop11:Click with SELECT to increase the value for the correction factor and with ADJUST to decrease it.
+Hop12:Click with SELECT to decrease the value for the correction factor and with ADJUST to increase it.
+Hop13:Click with SELECT to increase the value for the correction factor and with ADJUST to decrease it.
+Hop14:Click with SELECT to decrease the value for the correction factor and with ADJUST to increase it.
+#Hop16:Pick the line colour directly off the image.
+Hop18:Click here to select the line colour of the image using Pick-from-Sprite.
+
+# a few more messages
+
+mode:For optimum speed, DAA can only process 16 colour images. Please refer to your RISC OS and scanner manuals for further details.
+pcol:This is not a 16 colour sprite. Palette selection is unavailable.
+drag:To save, drag the icon to a directory display.
+derr:Filing system error:
+bads:Could not save as
+nopr:A suitable printer driver is not loaded.
+
+# the save image window
+
+sav0:Click 'OK' to save the file as the current filename (if valid).
+sav1:Type in the filename here and click 'OK', or drag the icon above to a directory display.
+sav2:Drag this icon to a directory display to save, or to a suitable application to edit.
+
+# Scale window
+
+Hscl1:Click SELECT and enter the scale here as a percentage and press RETURN to update the view.
+Hscl2:Click SELECT to decrease the current scale and ADJUST to increase it.
+Hscl3:Click SELECT to increase the current scale and ADJUST to decrease it.
+Hscl5:Click here to set the scale to the percentage shown.
+Hscl6:Click here to set the scale to the percentage shown.
+Hscl7:Click here to set the scale to the percentage shown.
+Hscl8:Click here to set the scale to the percentage shown.
+Hscl9:Click here to close the scale window and leave the view unchanged.
+Hscl10:Click here to accept the scale shown and update the view.
+
+Hop1:
+Hop3:
+
+int:internal error code
+cont:. OK to continue, CANCEL to quit. ERR#=
+areac:First  Area
+areaf:Second Area
+tcut1:Total  Area 1
+tfill1:Total  Area 2
+tcut2:Total Area 1
+tfill2:Total Area 2
+
+Tinfo1:(Calib)
+Tinfo2:(Set 1)
+Tinfo3:(Set 2)
